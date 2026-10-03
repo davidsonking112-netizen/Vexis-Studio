@@ -156,10 +156,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .file-item:hover { background:rgba(255,255,255,.035); color:var(--text); }
 .file-item.active { background:rgba(139,124,255,.10); color:#e8e5ff; box-shadow:inset 2px 0 var(--accent); }
 .editor-pane { min-width:0; display:grid; grid-template-rows:42px minmax(0,1fr) 42px; }
-.editor-tab { display:flex; align-items:center; justify-content:space-between; padding:0 14px; border-bottom:1px solid var(--line); background:rgba(13,16,24,.72); }
-.editor-tab strong { font-size:10px; color:#c5cbd8; }
-.editor-tab span { font-size:9px; color:#687184; }
+.editor-tabs { display:flex; align-items:stretch; min-width:0; overflow:auto; border-bottom:1px solid var(--line); background:rgba(13,16,24,.72); }
+.editor-tab { min-width:150px; max-width:240px; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 9px 0 12px; border:0; border-right:1px solid var(--line); background:transparent; color:#858da1; cursor:pointer; }
+.editor-tab:hover { background:rgba(255,255,255,.035); color:var(--text); }
+.editor-tab.active { background:rgba(139,124,255,.10); color:#e8e5ff; box-shadow:inset 0 -2px var(--accent); }
+.editor-tab .tab-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10px; }
+.editor-tab .tab-dirty { color:var(--accent-2); font-size:12px; line-height:1; }
+.editor-tab .tab-close { border:0; background:transparent; color:#697287; width:20px; height:20px; border-radius:5px; cursor:pointer; font-size:13px; }
+.editor-tab .tab-close:hover { background:rgba(255,255,255,.07); color:var(--text); }
+.editor-tab-meta { display:flex; align-items:center; gap:8px; padding:0 12px; border-bottom:1px solid var(--line); background:rgba(13,16,24,.72); }
+.editor-tab-meta span { font-size:9px; color:#687184; }
 .editor-code { width:100%; height:100%; resize:none; border:0; outline:0; background:#080a10; color:#dce1eb; padding:18px; font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; tab-size:2; }
+.file-item.open::after { content:"•"; float:right; color:var(--accent); }
+.file-item.open.active::after { color:var(--accent-2); }
 .editor-status { display:flex; align-items:center; justify-content:space-between; padding:0 12px; border-top:1px solid var(--line); background:rgba(13,16,24,.8); }
 .editor-status span { color:#697287; font-size:9px; }
 .editor-save { border:1px solid rgba(174,160,255,.35); background:rgba(139,124,255,.12); color:#d8d2ff; border-radius:8px; padding:6px 11px; font-size:9px; cursor:pointer; }
@@ -238,7 +247,7 @@ kbd { border:1px solid var(--line-strong); background:var(--panel-3); color:var(
       <section id="messages" class="messages" hidden></section>
     <section id="editor-view" class="editor-shell" hidden>
       <div class="editor-files"><div class="editor-files-head"><strong>Files</strong><span id="file-count"></span></div><div id="file-list"></div></div>
-      <div class="editor-pane"><div class="editor-tab"><strong id="editor-path">Select a file</strong><span id="editor-hash"></span></div><textarea id="editor-code" class="editor-code" spellcheck="false" disabled placeholder="Select a workspace file to begin editing…"></textarea><div class="editor-status"><span id="editor-message">Safe editor · hash guarded saves</span><button id="editor-save" class="editor-save" type="button" disabled>Save changes</button></div></div>
+      <div class="editor-pane"><div class="editor-tabs" id="editor-tabs"></div><div class="editor-tab-meta"><span id="editor-path">Select a file</span><span id="editor-hash"></span></div><textarea id="editor-code" class="editor-code" spellcheck="false" disabled placeholder="Select a workspace file to begin editing…"></textarea><div class="editor-status"><span id="editor-message">Safe editor · hash guarded saves</span><div style="display:flex;gap:7px"><button id="editor-save-all" class="editor-save" type="button" disabled>Save all</button><button id="editor-save" class="editor-save" type="button" disabled>Save changes</button></div></div></div>
     </section>
 
     <div class="composer-wrap">
@@ -289,6 +298,7 @@ const toolSearch = document.getElementById("tool-search");
 let toolList = [];
 let activeView = "agent";
 let editorFiles = [];
+let editorOpenFiles = [];
 let editorCurrent = null;
 let activeTaskId = null;
 let activeEvents = null;
@@ -379,58 +389,58 @@ async function discoverTools(query = "") {
   }
 }
 
-async function loadEditorFiles() {
-  const response = await fetch("/api/editor/files");
-  if (!response.ok) throw new Error("Unable to load workspace files");
-  const data = await response.json();
-  editorFiles = Array.isArray(data.entries) ? data.entries.filter(entry => entry.type === "file") : [];
-  document.getElementById("file-count").textContent = editorFiles.length;
-  const list = document.getElementById("file-list");
-  list.replaceChildren();
-  for (const file of editorFiles) {
-    const buttonEl = document.createElement("button");
-    buttonEl.className = "file-item";
-    buttonEl.type = "button";
-    buttonEl.textContent = file.path;
-    buttonEl.addEventListener("click", () => openEditorFile(file.path, buttonEl));
-    list.appendChild(buttonEl);
+function editorIsDirty(file) { return !!file && file.content !== file.original; }
+function updateEditorChrome() {
+  const tabs = document.getElementById("editor-tabs"); tabs.replaceChildren();
+  for (const file of editorOpenFiles) {
+    const tab=document.createElement("button"); tab.className="editor-tab"+(file===editorCurrent?" active":""); tab.type="button";
+    const name=document.createElement("span"); name.className="tab-name"; name.textContent=file.path;
+    const dirty=document.createElement("span"); dirty.className="tab-dirty"; dirty.textContent=editorIsDirty(file)?"•":"";
+    const close=document.createElement("button"); close.className="tab-close"; close.type="button"; close.textContent="×"; close.title="Close file";
+    close.addEventListener("click",e=>{e.stopPropagation();closeEditorFile(file);}); tab.append(name,dirty,close); tab.addEventListener("click",()=>selectEditorFile(file)); tabs.appendChild(tab);
   }
+  document.querySelectorAll(".file-item").forEach(item=>{const open=editorOpenFiles.some(f=>f.path===item.dataset.path);item.classList.toggle("active",open&&editorCurrent?.path===item.dataset.path);item.classList.toggle("open",open);});
+  document.getElementById("editor-save").disabled=!editorCurrent||!editorIsDirty(editorCurrent);
+  document.getElementById("editor-save-all").disabled=!editorOpenFiles.some(editorIsDirty);
 }
-async function openEditorFile(path, buttonEl) {
-  try {
-    const response = await fetch("/api/editor/file?path=" + encodeURIComponent(path));
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Unable to open file");
-    editorCurrent = { path: data.path, sha256: data.sha256, original: data.content };
-    document.querySelectorAll(".file-item").forEach(item => item.classList.remove("active"));
-    buttonEl?.classList.add("active");
-    document.getElementById("editor-path").textContent = data.path;
-    document.getElementById("editor-hash").textContent = data.sha256.slice(0, 10);
-    const code = document.getElementById("editor-code");
-    code.disabled = false; code.value = data.content;
-    document.getElementById("editor-save").disabled = false;
-    document.getElementById("editor-message").textContent = "Loaded · changes are protected by SHA-256";
-  } catch (error) { document.getElementById("editor-message").textContent = error.message; }
+async function loadEditorFiles() {
+  const response=await fetch("/api/editor/files"); if(!response.ok) throw new Error("Unable to load workspace files");
+  const data=await response.json(); editorFiles=Array.isArray(data.entries)?data.entries.filter(e=>e.type==="file"):[];
+  document.getElementById("file-count").textContent=editorFiles.length; const list=document.getElementById("file-list"); list.replaceChildren();
+  for(const file of editorFiles){const buttonEl=document.createElement("button");buttonEl.className="file-item";buttonEl.dataset.path=file.path;buttonEl.type="button";buttonEl.textContent=file.path;buttonEl.addEventListener("click",()=>openEditorFile(file.path));list.appendChild(buttonEl);}
+  updateEditorChrome();
+}
+function selectEditorFile(file) {
+  editorCurrent=file; document.getElementById("editor-path").textContent=file.path; document.getElementById("editor-hash").textContent=file.sha256.slice(0,10);
+  const code=document.getElementById("editor-code"); code.disabled=false; code.value=file.content;
+  document.getElementById("editor-message").textContent=editorIsDirty(file)?"Unsaved changes":"Loaded · changes are protected by SHA-256"; updateEditorChrome(); code.focus();
+}
+async function openEditorFile(path) {
+  const existing=editorOpenFiles.find(file=>file.path===path);
+  if(existing){ if(editorCurrent&&editorCurrent!==existing&&editorIsDirty(editorCurrent)&&!confirm("Discard unsaved changes in "+editorCurrent.path+"?")) return; selectEditorFile(existing); return; }
+  try{const response=await fetch("/api/editor/file?path="+encodeURIComponent(path));const data=await response.json();if(!response.ok)throw new Error(data.error||"Unable to open file");
+    const file={path:data.path,sha256:data.sha256,original:data.content,content:data.content}; editorOpenFiles.push(file); selectEditorFile(file);
+  }catch(error){document.getElementById("editor-message").textContent=error.message;}
+}
+function closeEditorFile(file) {
+  if(editorIsDirty(file)&&!confirm("Discard unsaved changes in "+file.path+"?")) return;
+  const index=editorOpenFiles.indexOf(file); if(index>=0) editorOpenFiles.splice(index,1);
+  if(editorCurrent===file){editorCurrent=editorOpenFiles[index]||editorOpenFiles[index-1]||null;if(editorCurrent)selectEditorFile(editorCurrent);else{document.getElementById("editor-path").textContent="Select a file";document.getElementById("editor-hash").textContent="";const code=document.getElementById("editor-code");code.value="";code.disabled=true;document.getElementById("editor-message").textContent="Safe editor · hash guarded saves";updateEditorChrome();}}else updateEditorChrome();
+}
+async function saveOneEditorFile(file) {
+  if(!file||!editorIsDirty(file)) return true;
+  const response=await fetch("/api/editor/file",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({path:file.path,expected_sha256:file.sha256,content:file.content})});
+  const data=await response.json(); if(!response.ok) throw new Error(data.error||"Save failed"); file.sha256=data.after_sha256;file.original=file.content; return true;
 }
 async function saveEditorFile() {
-  if (!editorCurrent) return;
-  const code = document.getElementById("editor-code");
-  const save = document.getElementById("editor-save");
-  if (code.value === editorCurrent.original) { document.getElementById("editor-message").textContent = "No changes to save."; return; }
-  save.disabled = true;
-  document.getElementById("editor-message").textContent = "Saving…";
-  try {
-    const response = await fetch("/api/editor/file", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({
-      path: editorCurrent.path, expected_sha256: editorCurrent.sha256, content: code.value
-    })});
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Save failed");
-    editorCurrent = { path:data.path, sha256:data.after_sha256, original:code.value };
-    document.getElementById("editor-hash").textContent = data.after_sha256.slice(0,10);
-    document.getElementById("editor-message").textContent = "Saved safely · " + data.after_sha256.slice(0,10);
-  } catch (error) {
-    document.getElementById("editor-message").textContent = error.message;
-  } finally { save.disabled = false; }
+  if(!editorCurrent||!editorIsDirty(editorCurrent)){document.getElementById("editor-message").textContent="No changes to save.";return;}
+  const save=document.getElementById("editor-save");save.disabled=true;document.getElementById("editor-message").textContent="Saving…";
+  try{await saveOneEditorFile(editorCurrent);document.getElementById("editor-hash").textContent=editorCurrent.sha256.slice(0,10);document.getElementById("editor-message").textContent="Saved safely · "+editorCurrent.sha256.slice(0,10);}catch(error){document.getElementById("editor-message").textContent=error.message;}finally{updateEditorChrome();}
+}
+async function saveAllEditorFiles() {
+  const dirty=editorOpenFiles.filter(editorIsDirty); if(!dirty.length){document.getElementById("editor-message").textContent="All open files are saved.";return;}
+  document.getElementById("editor-save-all").disabled=true;document.getElementById("editor-message").textContent="Saving "+dirty.length+" file"+(dirty.length===1?"":"s")+"…";
+  try{for(const file of dirty)await saveOneEditorFile(file);document.getElementById("editor-message").textContent="All open changes saved safely";}catch(error){document.getElementById("editor-message").textContent=error.message;}finally{updateEditorChrome();}
 }
 
 function selectView(view) {
@@ -569,7 +579,14 @@ document.getElementById("editor-nav").addEventListener("click", async () => {
   selectView("editor");
   try { await loadEditorFiles(); } catch (error) { document.getElementById("editor-message").textContent = error.message; }
 });
+document.getElementById("editor-code").addEventListener("input", event => {
+  if (!editorCurrent) return;
+  editorCurrent.content = event.target.value;
+  document.getElementById("editor-message").textContent = editorIsDirty(editorCurrent) ? "Unsaved changes" : "No unsaved changes";
+  updateEditorChrome();
+});
 document.getElementById("editor-save").addEventListener("click", saveEditorFile);
+document.getElementById("editor-save-all").addEventListener("click", saveAllEditorFiles);
 
 loadTools();
 
