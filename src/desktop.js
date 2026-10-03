@@ -147,6 +147,24 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .run:hover { filter:brightness(1.08); }
 .run:disabled { opacity:.45; cursor:wait; }
 
+.editor-shell { height:100%; min-height:0; display:grid; grid-template-columns:220px minmax(0,1fr); background:rgba(7,9,14,.22); }
+.editor-files { border-right:1px solid var(--line); overflow:auto; background:rgba(9,11,17,.58); }
+.editor-files-head { padding:14px 13px 10px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); }
+.editor-files-head strong { font-size:10px; letter-spacing:.08em; text-transform:uppercase; }
+.editor-files-head span { color:#687184; font-size:9px; }
+.file-item { width:100%; border:0; border-bottom:1px solid rgba(255,255,255,.035); background:transparent; color:#9ea7b8; padding:8px 12px; text-align:left; cursor:pointer; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.file-item:hover { background:rgba(255,255,255,.035); color:var(--text); }
+.file-item.active { background:rgba(139,124,255,.10); color:#e8e5ff; box-shadow:inset 2px 0 var(--accent); }
+.editor-pane { min-width:0; display:grid; grid-template-rows:42px minmax(0,1fr) 42px; }
+.editor-tab { display:flex; align-items:center; justify-content:space-between; padding:0 14px; border-bottom:1px solid var(--line); background:rgba(13,16,24,.72); }
+.editor-tab strong { font-size:10px; color:#c5cbd8; }
+.editor-tab span { font-size:9px; color:#687184; }
+.editor-code { width:100%; height:100%; resize:none; border:0; outline:0; background:#080a10; color:#dce1eb; padding:18px; font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; tab-size:2; }
+.editor-status { display:flex; align-items:center; justify-content:space-between; padding:0 12px; border-top:1px solid var(--line); background:rgba(13,16,24,.8); }
+.editor-status span { color:#697287; font-size:9px; }
+.editor-save { border:1px solid rgba(174,160,255,.35); background:rgba(139,124,255,.12); color:#d8d2ff; border-radius:8px; padding:6px 11px; font-size:9px; cursor:pointer; }
+.editor-save:hover { background:rgba(139,124,255,.2); }
+@media (max-width:700px) { .editor-shell { grid-template-columns:145px minmax(0,1fr); } .editor-code { padding:12px; font-size:11px; } }
 .rail h2 { font-size:12px; margin:3px 7px 13px; letter-spacing:-.02em; }
 .rail-subtitle { margin:-7px 7px 15px; color:#626b7d; font-size:9px; }
 .panel { border:1px solid var(--line); background:linear-gradient(145deg,rgba(17,20,30,.78),rgba(10,13,20,.62)); border-radius:13px; margin-bottom:10px; overflow:hidden; box-shadow:0 13px 32px rgba(0,0,0,.13); }
@@ -184,6 +202,7 @@ kbd { border:1px solid var(--line-strong); background:var(--panel-3); color:var(
     <div class="section-label">Workspace</div>
     <nav class="nav">
       <button id="agent-nav" class="active" type="button"><span class="dot"></span>Agent</button>
+      <button id="editor-nav" type="button"><span class="dot"></span>Editor</button>
       <button id="tools-nav" type="button"><span class="dot"></span>Tools</button>
       <button id="discover-nav" type="button"><span class="dot"></span>Discover</button>
     </nav>
@@ -217,7 +236,10 @@ kbd { border:1px solid var(--line-strong); background:var(--panel-3); color:var(
         </div>
       </section>
       <section id="messages" class="messages" hidden></section>
-    </main>
+    <section id="editor-view" class="editor-shell" hidden>
+      <div class="editor-files"><div class="editor-files-head"><strong>Files</strong><span id="file-count"></span></div><div id="file-list"></div></div>
+      <div class="editor-pane"><div class="editor-tab"><strong id="editor-path">Select a file</strong><span id="editor-hash"></span></div><textarea id="editor-code" class="editor-code" spellcheck="false" disabled placeholder="Select a workspace file to begin editing…"></textarea><div class="editor-status"><span id="editor-message">Safe editor · hash guarded saves</span><button id="editor-save" class="editor-save" type="button" disabled>Save changes</button></div></div>
+    </section>
 
     <div class="composer-wrap">
       <form id="task-form" class="composer">
@@ -266,6 +288,8 @@ const tools = document.getElementById("tools");
 const toolSearch = document.getElementById("tool-search");
 let toolList = [];
 let activeView = "agent";
+let editorFiles = [];
+let editorCurrent = null;
 let activeTaskId = null;
 let activeEvents = null;
 
@@ -355,10 +379,71 @@ async function discoverTools(query = "") {
   }
 }
 
+async function loadEditorFiles() {
+  const response = await fetch("/api/editor/files");
+  if (!response.ok) throw new Error("Unable to load workspace files");
+  const data = await response.json();
+  editorFiles = Array.isArray(data.entries) ? data.entries.filter(entry => entry.type === "file") : [];
+  document.getElementById("file-count").textContent = editorFiles.length;
+  const list = document.getElementById("file-list");
+  list.replaceChildren();
+  for (const file of editorFiles) {
+    const buttonEl = document.createElement("button");
+    buttonEl.className = "file-item";
+    buttonEl.type = "button";
+    buttonEl.textContent = file.path;
+    buttonEl.addEventListener("click", () => openEditorFile(file.path, buttonEl));
+    list.appendChild(buttonEl);
+  }
+}
+async function openEditorFile(path, buttonEl) {
+  try {
+    const response = await fetch("/api/editor/file?path=" + encodeURIComponent(path));
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Unable to open file");
+    editorCurrent = { path: data.path, sha256: data.sha256, original: data.content };
+    document.querySelectorAll(".file-item").forEach(item => item.classList.remove("active"));
+    buttonEl?.classList.add("active");
+    document.getElementById("editor-path").textContent = data.path;
+    document.getElementById("editor-hash").textContent = data.sha256.slice(0, 10);
+    const code = document.getElementById("editor-code");
+    code.disabled = false; code.value = data.content;
+    document.getElementById("editor-save").disabled = false;
+    document.getElementById("editor-message").textContent = "Loaded · changes are protected by SHA-256";
+  } catch (error) { document.getElementById("editor-message").textContent = error.message; }
+}
+async function saveEditorFile() {
+  if (!editorCurrent) return;
+  const code = document.getElementById("editor-code");
+  const save = document.getElementById("editor-save");
+  if (code.value === editorCurrent.original) { document.getElementById("editor-message").textContent = "No changes to save."; return; }
+  save.disabled = true;
+  document.getElementById("editor-message").textContent = "Saving…";
+  try {
+    const response = await fetch("/api/editor/file", { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify({
+      path: editorCurrent.path, expected_sha256: editorCurrent.sha256, content: code.value
+    })});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Save failed");
+    editorCurrent = { path:data.path, sha256:data.after_sha256, original:code.value };
+    document.getElementById("editor-hash").textContent = data.after_sha256.slice(0,10);
+    document.getElementById("editor-message").textContent = "Saved safely · " + data.after_sha256.slice(0,10);
+  } catch (error) {
+    document.getElementById("editor-message").textContent = error.message;
+  } finally { save.disabled = false; }
+}
+
 function selectView(view) {
   activeView = view;
   document.querySelectorAll(".nav button").forEach(buttonEl => buttonEl.classList.remove("active"));
   document.getElementById(view + "-nav").classList.add("active");
+  const editor = document.getElementById("editor-view");
+  const conversationMain = document.getElementById("conversation");
+  const composer = document.querySelector(".composer-wrap");
+  const showEditor = view === "editor";
+  editor.hidden = !showEditor;
+  conversationMain.hidden = showEditor;
+  composer.style.display = showEditor ? "none" : "";
 }
 
 function resizeInput() {
@@ -480,6 +565,12 @@ document.getElementById("discover-nav").addEventListener("click", async () => {
   toolSearch.focus();
 });
 
+document.getElementById("editor-nav").addEventListener("click", async () => {
+  selectView("editor");
+  try { await loadEditorFiles(); } catch (error) { document.getElementById("editor-message").textContent = error.message; }
+});
+document.getElementById("editor-save").addEventListener("click", saveEditorFile);
+
 loadTools();
 
 try {
@@ -533,6 +624,8 @@ async function readJson(request) {
 export function createDesktop({
   agent,
   registry,
+  filesystem,
+  edit,
   host = DEFAULT_HOST,
   port = DEFAULT_PORT
 } = {}) {
@@ -540,6 +633,10 @@ export function createDesktop({
   if (!registry || typeof registry.list !== "function" || typeof registry.discover !== "function") {
     throw new TypeError("tool registry is required");
   }
+  if (!filesystem?.list_files?.execute || !filesystem?.read_file?.execute) {
+    throw new TypeError("filesystem tools are required");
+  }
+  if (!edit?.execute) throw new TypeError("edit tool is required");
 
   let server;
   let taskQueue = Promise.resolve();
@@ -591,6 +688,50 @@ export function createDesktop({
 
     if (request.method === "GET" && url.pathname === "/api/discover") {
       sendJson(response, 200, { tools: registry.discover(url.searchParams.get("q") || "") });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/editor/files") {
+      const result = await filesystem.list_files.execute({ path: ".", max_entries: 1000 });
+      sendJson(response, 200, result);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/editor/file") {
+      const requestedPath = url.searchParams.get("path");
+      if (!requestedPath) { sendJson(response, 400, { error: "path is required" }); return; }
+      const result = await filesystem.read_file.execute({ path: requestedPath });
+      const { createHash } = await import("node:crypto");
+      sendJson(response, 200, {
+        path: result.path,
+        bytes: result.bytes,
+        content: result.content,
+        sha256: createHash("sha256").update(result.content, "utf8").digest("hex")
+      });
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/editor/file") {
+      const body = await readJson(request);
+      if (typeof body.path !== "string" || !body.path || typeof body.expected_sha256 !== "string" || typeof body.content !== "string") {
+        sendJson(response, 400, { error: "path, expected_sha256, and content are required" });
+        return;
+      }
+      const current = await filesystem.read_file.execute({ path: body.path });
+      const { createHash } = await import("node:crypto");
+      const currentSha = createHash("sha256").update(current.content, "utf8").digest("hex");
+      if (currentSha.toLowerCase() !== body.expected_sha256.toLowerCase()) {
+        sendJson(response, 409, { error: "File changed since it was opened; reload before saving." });
+        return;
+      }
+      const replacement = await edit.execute({
+        path: body.path,
+        expected_sha256: body.expected_sha256,
+        old_text: current.content,
+        new_text: body.content,
+        expected_replacements: 1
+      });
+      sendJson(response, 200, replacement);
       return;
     }
 
