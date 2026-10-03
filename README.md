@@ -36,7 +36,7 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 6. **Test/debug loop** — run tests, inspect failures, repair, repeat. **Implemented**
 7. **Persistent task state** — plans, checkpoints, and resumable work. **Implemented**
 8. **Tool/skill system** — extensible capabilities and tool discovery. **Implemented**
-9. **Interactive CLI** — polished terminal experience.
+9. **Interactive CLI** — polished terminal experience. **Sector 1 implemented**
 10. **Editor integration** — IDE/editor workflow.
 11. **Multi-model runtime** — provider/model abstraction.
 12. **Safety and permissions** — approvals, sandboxing, limits, audit trail.
@@ -127,3 +127,27 @@ Stage 8 adds a capability registry without changing the existing tool execution 
 - exposes deterministic skill discovery and descriptions
 
 The registry is an orchestration layer, not a permission boundary. Tool safety remains owned by the underlying filesystem, command, editing, test, and task-state primitives; stronger authorization and sandboxing remain part of Stage 12.
+
+
+## Stage 9 interface architecture
+
+Stage 9 is deliberately split into three interface sectors:
+
+1. **CLI** — the primary scriptable terminal interface and the stable command/input contract.
+2. **TUI** — the interactive terminal workspace built on the same runtime and CLI contracts.
+3. **Desktop** — a separate desktop shell that reuses the runtime rather than duplicating agent logic.
+
+### Stage 9 / Sector 1: CLI
+
+The first interface layer provides:
+
+- interactive task submission
+- `/help`, `/tools`, and `/discover <query>` commands
+- clean `/exit` and `/quit` handling
+- reusable runtime construction for future interfaces
+- testable input/output boundaries
+- a `vexis` package executable and `npm run cli` entrypoint
+
+The CLI uses Node's stable readline interface for line-oriented terminal input. citeturn0search0
+
+The TUI and Desktop sectors will be added on top of this runtime boundary rather than becoming separate agent implementations.
