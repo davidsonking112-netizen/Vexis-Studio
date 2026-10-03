@@ -299,7 +299,7 @@ test("agent run supports per-run events and abort signals", async () => {
     onEvent: event => events.push(event.type)
   });
   assert.equal(result.output, "done");
-  assert.deepEqual(events, ["model_start", "model_response"]);
+  assert.deepEqual(events, ["token_budget_start", "token_budget", "model_start", "model_response"]);
 });
 
 
