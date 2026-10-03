@@ -58,3 +58,41 @@ test("agent stops at the step limit", async () => {
   assert.equal(result.status, "max_steps");
   assert.equal(result.steps, 3);
 });
+
+
+test("agent can verify, repair, and verify again", async () => {
+  let verified = false;
+  let repaired = false;
+
+  const model = new ScriptedModel([
+    { type: "tool_call", name: "run_tests", input: {} },
+    { type: "tool_call", name: "edit_file", input: { path: "fixture.js" } },
+    { type: "tool_call", name: "run_tests", input: {} },
+    { type: "final", content: "verified" }
+  ]);
+
+  const agent = new Agent({
+    model,
+    tools: {
+      run_tests: async () => {
+        if (!repaired) {
+          return { status: "failed", diagnostics: ["expected 1, received 2"] };
+        }
+
+        verified = true;
+        return { status: "passed", diagnostics: [] };
+      },
+      edit_file: async () => {
+        repaired = true;
+        return { changed: true, replacements: 1 };
+      }
+    }
+  });
+
+  const result = await agent.run("repair the failing test");
+
+  assert.equal(result.status, "completed");
+  assert.equal(result.output, "verified");
+  assert.equal(verified, true);
+  assert.equal(repaired, true);
+});
