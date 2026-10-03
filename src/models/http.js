@@ -17,11 +17,11 @@ function parseJson(text) {
   }
 }
 
-function providerError(response, body) {
+function providerError(response, body, provider = "openai-compatible") {
   const detail = body?.error?.message || body?.message || response.statusText || "Unknown provider error";
   const error = new Error(`Model provider request failed (${response.status}): ${detail}`);
   error.status = response.status;
-  error.provider = this.provider || "openai-compatible";
+  error.provider = provider;
   error.retryable = response.status === 408 || response.status === 409 || response.status === 429 || response.status >= 500;
   return error;
 }
@@ -182,7 +182,7 @@ export class OpenAICompatibleModel {
           const text = await response.text();
           const payload = text ? parseJson(text) : {};
 
-          if (!response.ok) throw providerError(response, payload);
+          if (!response.ok) throw providerError(response, payload, this.provider);
 
           const normalized = normalizeModelResponse(extractChoice(payload.choices?.[0]));
           return {
