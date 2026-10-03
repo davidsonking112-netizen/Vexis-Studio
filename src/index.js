@@ -11,12 +11,14 @@ const filesystem = createFilesystemTools({ workspace });
 const command = createCommandTool({ workspace, timeoutMs: 120_000 });
 const codebase = createCodebaseTool({ workspace, filesystem });
 const edit = createEditTool({ workspace, filesystem });
+const testTool = createTestTool({ workspace, command });
 
 const tools = {
   ...toAgentTools(filesystem),
   ...toAgentCommandTool(command),
   ...toAgentCodebaseTool(codebase),
-  ...toAgentEditTool(edit)
+  ...toAgentEditTool(edit),
+  ...toAgentTestTool(testTool)
 };
 
 const model = {
