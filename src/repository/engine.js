@@ -115,7 +115,7 @@ export class RepositoryIntelligence {
     const symbols=index.symbols.filter(s=>(!file || s.file===file) && (!query || (s.name+" "+s.kind+" "+s.file).toLowerCase().includes(query))).slice(0, Number(input.limit)||100);
     const dependencies=file ? index.dependencies.filter(d=>d.from===file) : index.dependencies;
     const dependents=file ? (index.reverse[file]||[]).map(from=>({from,to:file})) : [];
-    return {version:index.version,indexedAt:index.indexedAt,files:index.files.length,symbols:symbols.length,dependencies:dependencies.length,query,file,symbols,dependencies,dependents,truncated:index.truncated};
+    return {version:index.version,indexedAt:index.indexedAt,files:index.files.length,symbol_count:symbols.length,dependency_count:dependencies.length,query,file,symbols,dependencies,dependents,truncated:index.truncated};
   }
 
   async searchSymbols(input={}) { return this.inspect({...input,limit:Math.min(200,Number(input.limit)||50)}); }
