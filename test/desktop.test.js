@@ -27,6 +27,10 @@ test("desktop serves a local UI and tool endpoints", async () => {
     assert.match(html, /Vexis Studio/);
     assert.match(html, /\/api\/discover\?q=/);
     assert.match(html, /Discover/);
+    assert.match(html, /Build something/);
+    assert.match(html, /hero-orbit/);
+    assert.match(html, /composer-top/);
+    assert.match(html, /Workspace connected/);
 
     const tools = await json(address.url + "api/tools");
     assert.equal(tools.response.status, 200);
