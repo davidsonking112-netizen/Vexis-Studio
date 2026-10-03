@@ -90,3 +90,53 @@ test("rejects invalid checkpoints and unsafe state paths", async () => {
     await fs.rm(workspace, { recursive: true, force: true });
   }
 });
+
+
+test("rejects state paths redirected outside the workspace", async () => {
+  const workspace = await createWorkspace();
+  const outside = await createWorkspace();
+
+  try {
+    await fs.mkdir(path.join(workspace, ".vexis"));
+    await fs.symlink(outside, path.join(workspace, ".vexis", "state"));
+
+    const tool = createTaskStateTool({
+      workspace,
+      statePath: ".vexis/state/task-state.json"
+    });
+
+    await assert.rejects(
+      tool.execute({
+        action: "initialize",
+        task: "Unsafe path",
+        plan: [{ id: "step", title: "Step" }]
+      }),
+      /escapes the workspace/
+    );
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+    await fs.rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("rejects duplicate plan step ids", async () => {
+  const workspace = await createWorkspace();
+
+  try {
+    const tool = createTaskStateTool({ workspace });
+
+    await assert.rejects(
+      tool.execute({
+        action: "initialize",
+        task: "Task",
+        plan: [
+          { id: "same", title: "First" },
+          { id: "same", title: "Second" }
+        ]
+      }),
+      /duplicate plan step id/
+    );
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
