@@ -161,3 +161,25 @@ test("planning replaces stale persisted state instead of silently executing an u
   assert.equal(state.state.task_id, "fresh-plan");
   assert.equal(state.state.plan[0].id, "fresh-step");
 });
+
+
+test("planning JSON extraction tolerates fenced output and trailing prose", async () => {
+  const root = await workspace();
+  try {
+    const taskState = createTaskStateTool({ workspace: root });
+    const contextEngine = { maxTokens: 1000, async build() { return { content: "repo" }; } };
+    const model = {
+      async next() {
+        return {
+          type: "final",
+          content: "Here is the plan:\n\\`\\`\\`json\n" + JSON.stringify(samplePlan()) + "\n\\`\\`\\`\nDone."
+        };
+      }
+    };
+    const engine = new PlanningEngine({ model, contextEngine, taskState });
+    const plan = await engine.create("Implement a feature");
+    assert.equal(plan.steps.length, 2);
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
