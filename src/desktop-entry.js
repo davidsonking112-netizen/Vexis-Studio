@@ -1,8 +1,8 @@
 import { createRuntime } from "./runtime.js";
 import { createDesktop } from "./desktop.js";
 
-const { agent, registry } = createRuntime();
-const desktop = createDesktop({ agent, registry });
+const { agent, registry, filesystem, edit } = createRuntime();
+const desktop = createDesktop({ agent, registry, filesystem, edit });
 const address = await desktop.start();
 
 process.stdout.write(`Vexis Desktop: ${address.url}\n`);
