@@ -8,6 +8,7 @@ import { createEditTool } from "./tools/edit.js";
 import { createTestTool } from "./tools/test.js";
 import { createTaskStateTool } from "./tools/task_state.js";
 import { createContextEngine } from "./context/engine.js";
+import { createPlanningEngine } from "./planning/engine.js";
 import { createToolRegistry } from "./tools/registry.js";
 
 export function createRuntime({
@@ -16,7 +17,9 @@ export function createRuntime({
   modelConfig = {},
   providerRegistry = createDefaultProviderRegistry(),
   modelProfiles = loadModelProfiles(),
-  contextConfig = {}
+  contextConfig = {},
+  planningConfig = {},
+  enablePlanning = true
 } = {}) {
   const selectedModel = model || createConfiguredModel({
     ...modelConfig,
@@ -32,6 +35,9 @@ export function createRuntime({
   const testTool = createTestTool({ workspace, command });
   const taskState = createTaskStateTool({ workspace });
   const contextEngine = createContextEngine({ workspace, filesystem, taskState, ...contextConfig });
+  const planningEngine = enablePlanning
+    ? createPlanningEngine({ model: selectedModel, contextEngine, taskState, ...planningConfig })
+    : null;
   const registry = createToolRegistry({
     ...filesystem,
     run_command: command,
@@ -46,7 +52,8 @@ export function createRuntime({
     model: selectedModel,
     tools,
     toolDefinitions: registry.list(),
-    contextEngine
+    contextEngine,
+    planningEngine
   });
 
   return {
@@ -59,6 +66,7 @@ export function createRuntime({
     edit,
     codebase,
     contextEngine,
+    planningEngine,
     workspace
   };
 }
