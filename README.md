@@ -43,6 +43,7 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 13. **Streaming + rich tool calling** — streaming events, structured outputs, and richer tool semantics.
 14. **Context intelligence** — context selection, compression, token budgeting, and intelligent refresh. **Implemented**
 15. **Planning engine** — explicit plans, decomposition, verification, dependency graphs, persistence, and recovery. **Implemented**
+16. **Agent memory** — bounded structured memory, retrieval, provenance, deduplication, and durable agent learning. **Implemented**
 
 ## Stage 10 / Sector 1: Editor integration
 
