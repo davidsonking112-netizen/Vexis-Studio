@@ -317,3 +317,24 @@ Named profiles can be supplied as JSON through `VEXIS_MODEL_PROFILES`, then sele
 Provider credentials are read from environment/runtime configuration and are never persisted into task state.
 
 Stage 12 deliberately does not add streaming yet. Streaming and richer tool semantics are isolated into Stage 13 so the provider adapters remain testable and the Agent contract stays stable.
+
+
+## Stage 13 streaming and rich tool calling
+
+Stage 13 completes the model-to-agent streaming path without changing the underlying tool safety boundaries.
+
+The runtime now provides:
+
+- a normalized model response contract for single and multiple tool calls
+- a normalized streaming event contract for text deltas, tool-call deltas, finish events, completed responses, and provider metadata
+- hardened OpenAI-compatible SSE streaming with fragmented-frame handling, cancellation, timeout enforcement, and bounded retries before a stream begins
+- native Anthropic Messages API streaming with text and incremental tool-input events
+- multiple tool-call preservation across providers
+- parallel execution of independent tool calls in the agent with deterministic result/message ordering
+- a shared agent event stream consumed by the existing desktop SSE task endpoint and available to CLI/TUI integrations
+- provider capability metadata aligned with the actual adapters
+- provider/model/usage metadata carried through final responses
+
+Streaming retries are intentionally limited to failures before a response stream has been consumed. Once model output has begun, Vexis does not silently replay a partially observed generation.
+
+Stage 13 is considered complete only when the provider adapters, agent execution semantics, event contract, and automated verification remain coherent together.
