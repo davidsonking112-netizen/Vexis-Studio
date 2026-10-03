@@ -30,7 +30,6 @@ function sleep(ms, signal) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(new Error("Model request cancelled"));
     const timer = setTimeout(resolve, ms);
-    if (typeof timer.unref === "function") timer.unref();
     signal?.addEventListener("abort", () => {
       clearTimeout(timer);
       reject(new Error("Model request cancelled"));
@@ -148,7 +147,6 @@ export class OpenAICompatibleModel {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-    if (typeof timeout.unref === "function") timeout.unref();
 
     const abort = () => controller.abort();
     signal?.addEventListener("abort", abort, { once: true });
