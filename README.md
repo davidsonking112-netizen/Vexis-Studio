@@ -227,3 +227,33 @@ The editor currently provides:
 The intelligence layer is intentionally lightweight and deterministic. Full LSP integration, richer semantic analysis, refactoring services, and language-server-backed completion remain later platform work rather than being hidden inside the Stage 10 editor.
 
 Stage 10 is complete when the editor surface, intelligence boundary, guarded persistence, diff/review flow, and automated coverage remain green together.
+
+## Stage 11 real model runtime
+
+Stage 11 replaces the deterministic demonstration model with a real provider boundary while preserving the existing agent/tool architecture.
+
+The runtime now provides:
+
+- a stable model contract with normalized final responses and tool calls
+- an OpenAI-compatible HTTP transport using Node's built-in fetch
+- configurable model, endpoint, API key, timeout, and retry policy through runtime options or environment variables
+- structured conversion of Vexis tool definitions into provider function tools
+- normalization of provider tool calls back into the agent's internal contract
+- provider usage and request-id metadata without exposing secrets
+- bounded exponential retries for explicitly retryable provider failures
+- request cancellation and timeout handling
+- provider-independent runtime construction: callers may inject any model implementing the contract
+- correct assistant tool-call history so real providers receive valid multi-turn tool interactions
+- automated coverage for final responses, tool calls, failures/retries, and cancellation
+
+### Model configuration
+
+```bash
+VEXIS_MODEL_API_KEY=...
+VEXIS_MODEL=gpt-5
+VEXIS_MODEL_BASE_URL=https://api.openai.com/v1
+```
+
+`VEXIS_MODEL_BASE_URL` can point at another OpenAI-compatible service, including a local inference server. The transport deliberately remains generic; native provider-specific adapters, streaming, richer tool-call semantics, and multi-provider discovery are Stage 12/13 work.
+
+Vexis does not store provider credentials in the repository or task state.
