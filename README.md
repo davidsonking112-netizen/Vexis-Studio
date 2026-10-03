@@ -42,7 +42,7 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 12. **Multi-provider runtime** — native provider adapters, profiles, capabilities, and provider registry. **Implemented**
 13. **Streaming + rich tool calling** — streaming events, structured outputs, and richer tool semantics.
 14. **Context intelligence** — context selection, compression, token budgeting, and intelligent refresh. **Implemented**
-15. **Planning engine** — explicit plans, decomposition, verification, and recovery.
+15. **Planning engine** — explicit plans, decomposition, verification, dependency graphs, persistence, and recovery. **Implemented**
 
 ## Stage 10 / Sector 1: Editor integration
 
@@ -372,3 +372,51 @@ Each context build returns a versioned object containing:
 The Agent emits a context_update event before each model turn. After tool execution the context snapshot is invalidated so the next turn sees fresh workspace structure.
 
 Stage 14 is considered complete only when context selection, budgeting, compression, agent integration, and automated verification remain coherent together.
+
+
+## Stage 15 planning engine
+
+Stage 15 introduces a first-class planning subsystem designed for precision rather than a cosmetic list of model-generated steps.
+
+The planning engine is responsible for turning a user task into a validated execution specification before implementation begins.
+
+### Planning contract
+
+Every plan contains:
+
+- a stable plan identifier and task
+- explicit goals and completion criteria
+- declared assumptions
+- risks with mitigations and severity
+- atomic execution steps
+- explicit dependencies between steps
+- target files when known
+- concrete actions
+- verification gates
+- acceptance criteria
+- rollback guidance
+- priority and resumable status
+
+Plans are validated before execution. Vexis rejects duplicate step IDs, unknown dependencies, self-dependencies, cyclic dependency graphs, invalid statuses/priorities, excessive plan size, and steps without verification or acceptance criteria.
+
+### Execution semantics
+
+The Agent can run a planning preflight before tool execution:
+
+`task → context → plan → validation → execution → verification`
+
+The validated plan is persisted through the existing workspace task-state boundary and supplied back to the execution model as an explicit execution contract. The Agent emits a `plan_created` event so CLI/TUI/Desktop consumers can display the plan rather than hiding it inside model reasoning.
+
+The planning engine also exposes deterministic dependency-aware readiness and progress calculations, making it possible for later orchestration stages to execute independent ready steps, pause blocked work, checkpoint progress, and replan when repository reality changes.
+
+### Why this design
+
+Research into production agent patterns consistently points toward explicit workflow structure for complex work, with sequential execution as the default and parallelization/evaluator loops introduced only when they provide measurable value. Anthropic documents sequential, parallel, orchestrator-worker, and evaluator-optimizer patterns and recommends starting with the simplest workflow that solves the problem. citeturn0search1turn0search6
+
+OpenAI's Codex guidance similarly describes long-running execution plans as living design documents that make complex work inspectable and resumable. citeturn0search4
+
+SWE-agent research emphasizes a tight agent/computer interface, bounded context, and iterative observation rather than hiding repository interaction behind a giant framework. citeturn0search12turn0search15
+
+Vexis adopts those principles but keeps the implementation deliberately native to its architecture: deterministic validation and state are Vexis-owned; the model proposes the plan; the runtime verifies the plan before execution.
+
+Stage 15 is considered complete only when planning, dependency validation, persistence, agent preflight, verification gates, and automated tests remain coherent together.
