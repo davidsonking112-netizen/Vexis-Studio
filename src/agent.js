@@ -1,12 +1,12 @@
 export class Agent {
-  constructor({ model, tools = {}, maxSteps = 20, onEvent = () => {} }) {
+  constructor({ model, tools = {}, toolDefinitions = null, maxSteps = 20, onEvent = () => {} }) {
     if (!model || typeof model.next !== "function") {
       throw new TypeError("model.next must be a function");
     }
 
     this.model = model;
     this.tools = tools;
-    this.toolDefinitions = arguments[0].toolDefinitions || Object.keys(tools).map(name => ({ name, description: "" }));
+    this.toolDefinitions = toolDefinitions || Object.keys(tools).map(name => ({ name, description: "" }));
     this.maxSteps = maxSteps;
     this.onEvent = onEvent;
   }
