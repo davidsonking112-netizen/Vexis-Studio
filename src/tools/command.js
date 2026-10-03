@@ -20,7 +20,18 @@ const DEFAULT_ALLOWED_COMMANDS = new Set([
 ]);
 
 function commandName(command) {
-  return path.basename(command).toLowerCase().replace(/\\.exe$/i, "");
+  return path.basename(command).toLowerCase().replace(/\\.(?:exe|cmd|bat)$/i, "");
+}
+
+function spawnCommand(command) {
+  if (process.platform !== "win32") return command;
+
+  const name = commandName(command);
+  if (name === "npm" || name === "npx" || name === "pnpm" || name === "yarn" || name === "bun") {
+    return `${name}.cmd`;
+  }
+
+  return command;
 }
 
 function appendOutput(state, chunk, maxOutputBytes) {
@@ -109,7 +120,7 @@ export function createCommandTool({
         let timedOut = false;
         let outputLimitReached = false;
 
-        const child = spawn(command, args, {
+        const child = spawn(spawnCommand(command), args, {
           cwd: root,
           shell: false,
           windowsHide: true,
