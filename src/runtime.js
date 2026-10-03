@@ -14,7 +14,6 @@ export function createRuntime({ workspace = process.cwd() } = {}) {
   const edit = createEditTool({ workspace, filesystem });
   const testTool = createTestTool({ workspace, command });
   const taskState = createTaskStateTool({ workspace });
-
   const registry = createToolRegistry({
     ...filesystem,
     run_command: command,
@@ -23,47 +22,15 @@ export function createRuntime({ workspace = process.cwd() } = {}) {
     run_tests: testTool,
     task_state: taskState
   });
-
   const tools = registry.toAgentTools();
-
   const model = {
     async next({ messages, tools: availableTools }) {
       const last = messages.at(-1);
-
-      if (last?.role === "user") {
-        return {
-          type: "tool_call",
-          name: "inspect_codebase",
-          input: { path: ".", max_files: 100 }
-        };
-      }
-
-      if (last?.role === "tool" && last.name === "inspect_codebase") {
-        return {
-          type: "tool_call",
-          name: "run_command",
-          input: {
-            command: process.execPath,
-            args: ["--version"]
-          }
-        };
-      }
-
-      if (last?.role === "tool" && last.name === "run_command") {
-        return {
-          type: "final",
-          content: `Codebase inspection and controlled command execution are operational. Editing is available through hash-guarded exact replacements. Tools: ${availableTools.join(", ")}.`
-        };
-      }
-
-      return {
-        type: "final",
-        content: "Done."
-      };
+      if (last?.role === "user") return { type: "tool_call", name: "inspect_codebase", input: { path: ".", max_files: 100 } };
+      if (last?.role === "tool" && last.name === "inspect_codebase") return { type: "tool_call", name: "run_command", input: { command: process.execPath, args: ["--version"] } };
+      if (last?.role === "tool" && last.name === "run_command") return { type: "final", content: `Codebase inspection and controlled command execution are operational. Editing is available through hash-guarded exact replacements. Tools: ${availableTools.join(", ")}.` };
+      return { type: "final", content: "Done." };
     }
   };
-
-  const agent = new Agent({ model, tools });
-
-  return { agent, registry, workspace };
+  return { agent: new Agent({ model, tools }), registry, workspace };
 }
