@@ -1,0 +1,14 @@
+{
+  "name": "vexis-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vexis Studio - an AI coding agent built incrementally.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
