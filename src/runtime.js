@@ -1,5 +1,6 @@
 import { Agent } from "./agent.js";
-import { createModel } from "./models/http.js";
+import { createConfiguredModel, createDefaultProviderRegistry, loadModelProfiles } from "./models/config.js";
+import { assertModel } from "./models/model.js";
 import { createFilesystemTools } from "./tools/filesystem.js";
 import { createCommandTool } from "./tools/command.js";
 import { createCodebaseTool } from "./tools/codebase.js";
@@ -10,11 +11,17 @@ import { createToolRegistry } from "./tools/registry.js";
 
 export function createRuntime({
   workspace = process.cwd(),
-  model = createModel()
+  model = null,
+  modelConfig = {},
+  providerRegistry = createDefaultProviderRegistry(),
+  modelProfiles = loadModelProfiles()
 } = {}) {
-  if (!model || typeof model.next !== "function") {
-    throw new TypeError("model.next must be a function");
-  }
+  const selectedModel = model || createConfiguredModel({
+    ...modelConfig,
+    profiles: modelProfiles,
+    registry: providerRegistry
+  });
+  assertModel(selectedModel);
 
   const filesystem = createFilesystemTools({ workspace });
   const command = createCommandTool({ workspace, timeoutMs: 120_000 });
@@ -33,14 +40,16 @@ export function createRuntime({
   const tools = registry.toAgentTools();
 
   const agent = new Agent({
-    model,
+    model: selectedModel,
     tools,
     toolDefinitions: registry.list()
   });
 
   return {
     agent,
-    model,
+    model: selectedModel,
+    modelInfo: selectedModel.describe(),
+    providerRegistry,
     registry,
     filesystem,
     edit,
