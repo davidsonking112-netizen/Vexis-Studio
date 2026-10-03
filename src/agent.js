@@ -10,10 +10,12 @@ export class Agent {
     this.onEvent = onEvent;
   }
 
-  async run(task) {
+  async run(task, { signal } = {}) {
+    if (signal?.aborted) throw new Error("Task cancelled");
     const messages = [{ role: "user", content: task }];
 
     for (let step = 0; step < this.maxSteps; step++) {
+      if (signal?.aborted) throw new Error("Task cancelled");
       this.onEvent({ type: "model_start", step, messages });
 
       const response = await this.model.next({
