@@ -402,28 +402,6 @@ High-value failures are recorded automatically when tools fail, while successful
 The memory subsystem is provider-independent and does not persist model credentials or raw provider transcripts.
 
 Stage 16 is considered complete only when persistence, retrieval, deduplication, bounds, agent integration, explicit tool access, and automated verification remain coherent together.
-## Stage 17 repository intelligence
-
-Stage 17 gives Vexis a structural model of the repository rather than relying only on raw file retrieval.
-
-The repository intelligence engine provides:
-
-- bounded indexing of supported source files
-- function, class, interface, type, variable, struct, trait, and enum symbol extraction
-- source locations and export metadata
-- local import/require/include/module dependency edges
-- reverse dependency lookup
-- symbol search by name, kind, or file
-- refreshable cached indexes
-- dependency/build directory exclusion
-- strict file-count, byte, and symbol limits
-- provider-independent results exposed through the `repository_intelligence` tool
-
-The Agent receives a bounded repository-intelligence snapshot before model turns and invalidates the structural index after tool execution so edits cannot silently leave the model working from a stale graph.
-
-This is intentionally a lightweight structural index rather than a language-server replacement. Later editor/LSP stages can add compiler-grade semantics without coupling the core agent runtime to a particular language server.
-
-
 ## Stage 15 planning engine
 
 Stage 15 introduces a first-class planning subsystem designed for precision rather than a cosmetic list of model-generated steps.
@@ -470,3 +448,24 @@ SWE-agent research emphasizes a tight agent/computer interface, bounded context,
 Vexis adopts those principles but keeps the implementation deliberately native to its architecture: deterministic validation and state are Vexis-owned; the model proposes the plan; the runtime verifies the plan before execution.
 
 Stage 15 is considered complete only when planning, dependency validation, persistence, agent preflight, verification gates, and automated tests remain coherent together.
+
+## Stage 17 repository intelligence
+
+Stage 17 gives Vexis a structural model of the repository rather than relying only on raw file retrieval.
+
+The repository intelligence engine provides:
+
+- bounded indexing of supported source files
+- function, class, interface, type, variable, struct, trait, and enum symbol extraction
+- source locations and export metadata
+- local import/require/include/module dependency edges
+- reverse dependency lookup
+- symbol search by name, kind, or file
+- refreshable cached indexes
+- dependency/build directory exclusion
+- strict file-count, byte, and symbol limits
+- provider-independent results exposed through the `repository_intelligence` tool
+
+The Agent receives a bounded repository-intelligence snapshot before model turns and invalidates the structural index after tool execution so edits cannot silently leave the model working from a stale graph.
+
+This is intentionally a lightweight structural index rather than a language-server replacement. Later editor/LSP stages can add compiler-grade semantics without coupling the core agent runtime to a particular language server.
