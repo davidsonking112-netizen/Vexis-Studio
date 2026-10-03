@@ -195,6 +195,31 @@ test("agent injects bounded context before each model turn and refreshes it afte
 });
 
 
+
+test("compactMessages drops old turns and fits the input budget", () => {
+  const messages = [
+    { role: "system", content: "plan " + "x".repeat(5000) },
+    { role: "user", content: "current task" },
+    { role: "assistant", content: "old answer " + "y".repeat(5000) },
+    { role: "tool", name: "old", content: "old result " + "z".repeat(5000) },
+    { role: "assistant", content: "recent answer" },
+    { role: "tool", name: "recent", content: "recent result" }
+  ];
+  const result = compactMessages(messages, 2000);
+  assert.equal(result.compacted, true);
+  assert.ok(result.droppedMessages >= 1);
+  assert.ok(result.messages.some(message => message.role === "user" && message.content === "current task"));
+  assert.ok(result.messages.some(message => message.name === "recent"));
+  assert.ok(result.finalTokens <= 2000);
+});
+
+test("compactMessages leaves small requests untouched", () => {
+  const messages = [{ role: "user", content: "hello" }];
+  const result = compactMessages(messages, 100);
+  assert.equal(result.compacted, false);
+  assert.strictEqual(result.messages, messages);
+});
+
 test("agent creates an execution plan before acting when planning is enabled", async () => {
   const events = [];
   const planningEngine = {
