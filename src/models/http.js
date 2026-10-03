@@ -9,9 +9,17 @@ function trimSlash(value) {
   return String(value).replace(/\/+$/, "");
 }
 
-function parseJson(text) {
+function parseJson(text, { status = null, contentType = "" } = {}) {
   try { return JSON.parse(text); }
-  catch { throw new Error("Model provider returned invalid JSON"); }
+  catch {
+    const preview = String(text ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
+    const details = [
+      status == null ? "" : "status " + status,
+      contentType ? "content-type " + contentType : "",
+      preview ? "body: " + preview : "empty body"
+    ].filter(Boolean).join(", ");
+    throw new Error("Model provider returned invalid JSON" + (details ? " (" + details + ")" : ""));
+  }
 }
 
 function providerError(response, body, provider = "openai-compatible") {
@@ -37,7 +45,10 @@ function sleep(ms, signal) {
 
 async function readJsonResponse(response) {
   const text = await response.text();
-  return text ? parseJson(text) : {};
+  return text ? parseJson(text, {
+    status: response.status,
+    contentType: response.headers.get("content-type") || ""
+  }) : {};
 }
 
 function toProviderMessages(messages) {
@@ -185,18 +196,21 @@ export class OpenAICompatibleModel {
     maxRetries = DEFAULT_MAX_RETRIES,
     fetchImpl = globalThis.fetch,
     provider = "openai-compatible",
-    capabilities = null
+    capabilities = null,
+    maxTokens = 8192
   } = {}) {
     if (typeof fetchImpl !== "function") throw new TypeError("fetch implementation is required");
     if (!model || typeof model !== "string") throw new TypeError("model must be a non-empty string");
     if (!Number.isInteger(timeoutMs) || timeoutMs < 1) throw new TypeError("timeoutMs must be a positive integer");
     if (!Number.isInteger(maxRetries) || maxRetries < 0) throw new TypeError("maxRetries must be a non-negative integer");
+    if (!Number.isInteger(maxTokens) || maxTokens < 1) throw new TypeError("maxTokens must be a positive integer");
 
     this.apiKey = apiKey;
     this.baseUrl = trimSlash(baseUrl);
     this.model = model;
     this.timeoutMs = timeoutMs;
     this.maxRetries = maxRetries;
+    this.maxTokens = maxTokens;
     this.fetch = fetchImpl;
     this.provider = provider;
     this.capabilities = capabilities || {
@@ -235,6 +249,7 @@ export class OpenAICompatibleModel {
           const response = await this.fetch(this.baseUrl + "/chat/completions", {
             method: "POST",
             headers: {
+              "accept": "application/json",
               "content-type": "application/json",
               ...(this.apiKey ? { authorization: "Bearer " + this.apiKey } : {})
             },
@@ -242,8 +257,11 @@ export class OpenAICompatibleModel {
               model: this.model,
               messages: toProviderMessages(messages),
               temperature: 0,
-              tools: toProviderTools(toolDefinitions),
-              tool_choice: toolDefinitions.length ? "auto" : undefined
+              max_tokens: this.maxTokens,
+              ...(toolDefinitions.length ? {
+                tools: toProviderTools(toolDefinitions),
+                tool_choice: "auto"
+              } : {})
             }),
             signal: controller.signal
           });
@@ -290,6 +308,7 @@ export class OpenAICompatibleModel {
         const response = await this.fetch(this.baseUrl + "/chat/completions", {
           method: "POST",
           headers: {
+            "accept": "text/event-stream",
             "content-type": "application/json",
             ...(this.apiKey ? { authorization: "Bearer " + this.apiKey } : {})
           },
@@ -297,9 +316,12 @@ export class OpenAICompatibleModel {
             model: this.model,
             messages: toProviderMessages(messages),
             temperature: 0,
+            max_tokens: this.maxTokens,
             stream: true,
-            tools: toProviderTools(toolDefinitions),
-            tool_choice: toolDefinitions.length ? "auto" : undefined
+            ...(toolDefinitions.length ? {
+              tools: toProviderTools(toolDefinitions),
+              tool_choice: "auto"
+            } : {})
           }),
           signal: controller.signal
         });
