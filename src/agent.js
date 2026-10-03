@@ -91,6 +91,8 @@ export class Agent {
       modelMessages = [...memoryMessages, ...messages];
     }
 
+    const requestBudget = budget.prepare(modelMessages, null);
+    onEvent({ type: "token_budget", step, ...requestBudget, budget: budget.snapshot() });
     onEvent({ type: "model_start", step, messages: modelMessages });
 
     if (typeof this.model.nextStream === "function") {
@@ -98,12 +100,14 @@ export class Agent {
       for await (const event of this.model.nextStream({
         messages: modelMessages,
         toolDefinitions: this.toolDefinitions,
+        maxTokens: requestBudget.outputTokens,
         signal
       })) {
         onEvent(event);
         if (event.type === "complete") response = event.response;
       }
       if (!response) throw new Error("Streaming model ended without a complete response");
+      budget.record(response.usage);
       return response;
     }
 
@@ -111,6 +115,7 @@ export class Agent {
       messages: modelMessages,
       tools: Object.keys(this.tools),
       toolDefinitions: this.toolDefinitions,
+      maxTokens: requestBudget.outputTokens,
       signal
     });
   }
