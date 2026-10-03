@@ -27,6 +27,23 @@ function resolveInside(root, requestedPath = ".") {
   return target;
 }
 
+function isWithin(root, target) {
+  const relative = path.relative(root, target);
+  return relative === "" ||
+    (!relative.startsWith(".." + path.sep) && relative !== ".." && !path.isAbsolute(relative));
+}
+
+async function assertRealPathInside(root, target) {
+  const realRoot = await fs.realpath(root);
+  const realTarget = await fs.realpath(target);
+
+  if (!isWithin(realRoot, realTarget)) {
+    throw new Error("Path escapes the workspace");
+  }
+
+  return realTarget;
+}
+
 async function walk(directory, { root, ignores, results, maxEntries }) {
   if (results.length >= maxEntries) return;
 
@@ -39,6 +56,12 @@ async function walk(directory, { root, ignores, results, maxEntries }) {
 
     const absolute = path.join(directory, entry.name);
     const relative = path.relative(root, absolute) || ".";
+
+    // Symlinks are reported but never followed.
+    if (entry.isSymbolicLink()) {
+      results.push({ path: relative.split(path.sep).join("/"), type: "symlink" });
+      continue;
+    }
 
     results.push({
       path: relative.split(path.sep).join("/"),
@@ -57,11 +80,15 @@ export function createFilesystemTools({
   maxEntries = 2000,
   maxReadBytes = 1024 * 1024
 }) {
+  if (!workspace) {
+    throw new TypeError("workspace is required");
+  }
+
   const root = normalizeRoot(workspace);
 
   return {
     list_files: {
-      description: "List files and directories inside the workspace.",
+      description: "List files and directories inside the workspace without following symlinks.",
       input: {
         path: "relative directory path, default .",
         max_entries: "optional maximum number of entries"
@@ -74,18 +101,27 @@ export function createFilesystemTools({
           throw new Error("Path is not a directory");
         }
 
+        await assertRealPathInside(root, directory);
+
+        const limit = Math.min(
+          Number.isInteger(Number(max_entries)) && Number(max_entries) > 0
+            ? Number(max_entries)
+            : maxEntries,
+          maxEntries
+        );
+
         const results = [];
         await walk(directory, {
           root,
           ignores,
           results,
-          maxEntries: Math.min(Number(max_entries) || maxEntries, maxEntries)
+          maxEntries: limit
         });
 
         return {
           root: requestedPath,
           entries: results,
-          truncated: results.length >= maxEntries
+          truncated: results.length >= limit
         };
       }
     },
@@ -101,7 +137,8 @@ export function createFilesystemTools({
         }
 
         const file = resolveInside(root, requestedPath);
-        const stat = await fs.stat(file);
+        const safeFile = await assertRealPathInside(root, file);
+        const stat = await fs.stat(safeFile);
 
         if (!stat.isFile()) {
           throw new Error("Path is not a file");
@@ -114,7 +151,7 @@ export function createFilesystemTools({
         return {
           path: requestedPath.split(path.sep).join("/"),
           bytes: stat.size,
-          content: await fs.readFile(file, "utf8")
+          content: await fs.readFile(safeFile, "utf8")
         };
       }
     }
