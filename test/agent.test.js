@@ -146,3 +146,20 @@ test("agent executes multiple streaming tool calls concurrently and preserves re
   assert.deepEqual(started, ["slow", "fast"]);
   assert.equal(result.output, "done");
 });
+
+
+test("agent forwards streaming text events to its event sink", async () => {
+  const events = [];
+  const model = {
+    async next() { return { type: "final", content: "fallback" }; },
+    async *nextStream() {
+      yield { type: "text_delta", delta: "Hel", provider: "test", model: "stream" };
+      yield { type: "text_delta", delta: "lo", provider: "test", model: "stream" };
+      yield { type: "complete", response: { type: "final", content: "Hello" } };
+    }
+  };
+  const agent = new Agent({ model, onEvent: event => events.push(event) });
+  const result = await agent.run("stream");
+  assert.equal(result.output, "Hello");
+  assert.equal(events.filter(event => event.type === "text_delta").map(event => event.delta).join(""), "Hello");
+});
