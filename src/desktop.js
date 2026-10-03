@@ -633,10 +633,7 @@ export function createDesktop({
   if (!registry || typeof registry.list !== "function" || typeof registry.discover !== "function") {
     throw new TypeError("tool registry is required");
   }
-  if (!filesystem?.list_files?.execute || !filesystem?.read_file?.execute) {
-    throw new TypeError("filesystem tools are required");
-  }
-  if (!edit?.execute) throw new TypeError("edit tool is required");
+
 
   let server;
   let taskQueue = Promise.resolve();
@@ -692,12 +689,14 @@ export function createDesktop({
     }
 
     if (request.method === "GET" && url.pathname === "/api/editor/files") {
+      if (!filesystem?.list_files?.execute) { sendJson(response, 503, { error: "Editor filesystem is unavailable" }); return; }
       const result = await filesystem.list_files.execute({ path: ".", max_entries: 1000 });
       sendJson(response, 200, result);
       return;
     }
 
     if (request.method === "GET" && url.pathname === "/api/editor/file") {
+      if (!filesystem?.read_file?.execute) { sendJson(response, 503, { error: "Editor filesystem is unavailable" }); return; }
       const requestedPath = url.searchParams.get("path");
       if (!requestedPath) { sendJson(response, 400, { error: "path is required" }); return; }
       const result = await filesystem.read_file.execute({ path: requestedPath });
@@ -712,6 +711,7 @@ export function createDesktop({
     }
 
     if (request.method === "POST" && url.pathname === "/api/editor/file") {
+      if (!filesystem?.read_file?.execute || !edit?.execute) { sendJson(response, 503, { error: "Editor is unavailable" }); return; }
       const body = await readJson(request);
       if (typeof body.path !== "string" || !body.path || typeof body.expected_sha256 !== "string" || typeof body.content !== "string") {
         sendJson(response, 400, { error: "path, expected_sha256, and content are required" });
