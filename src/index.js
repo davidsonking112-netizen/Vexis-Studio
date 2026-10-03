@@ -1,20 +1,18 @@
 import { Agent } from "./agent.js";
 import { createFilesystemTools, toAgentTools } from "./tools/filesystem.js";
 import { createCommandTool, toAgentCommandTool } from "./tools/command.js";
+import { createCodebaseTool, toAgentCodebaseTool } from "./tools/codebase.js";
 
 const workspace = process.cwd();
 
-const filesystem = createFilesystemTools({
-  workspace
-});
-
-const command = createCommandTool({
-  workspace
-});
+const filesystem = createFilesystemTools({ workspace });
+const command = createCommandTool({ workspace });
+const codebase = createCodebaseTool({ workspace, filesystem });
 
 const tools = {
   ...toAgentTools(filesystem),
-  ...toAgentCommandTool(command)
+  ...toAgentCommandTool(command),
+  ...toAgentCodebaseTool(codebase)
 };
 
 const model = {
@@ -24,12 +22,12 @@ const model = {
     if (last?.role === "user") {
       return {
         type: "tool_call",
-        name: "list_files",
-        input: { path: ".", max_entries: 100 }
+        name: "inspect_codebase",
+        input: { path: ".", max_files: 100 }
       };
     }
 
-    if (last?.role === "tool" && last.name === "list_files") {
+    if (last?.role === "tool" && last.name === "inspect_codebase") {
       return {
         type: "tool_call",
         name: "run_command",
@@ -43,7 +41,7 @@ const model = {
     if (last?.role === "tool" && last.name === "run_command") {
       return {
         type: "final",
-        content: `Workspace inspection and controlled command execution are operational. Tools: ${availableTools.join(", ")}.`
+        content: `Codebase inspection and controlled command execution are operational. Tools: ${availableTools.join(", ")}.`
       };
     }
 
