@@ -32,7 +32,7 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 2. **Filesystem tools** — controlled listing and reading inside a workspace. **Implemented**
 3. **Command execution** — run approved development commands without invoking a shell. **Implemented**
 4. **Codebase understanding** — bounded structural project inspection and context selection. **Implemented**
-5. **Editing loop** — propose/apply changes and verify them.
+5. **Editing loop** — propose/apply changes and verify them with hash-guarded exact replacements. **Implemented**
 6. **Test/debug loop** — run tests, inspect failures, repair, repeat.
 7. **Persistent task state** — plans, checkpoints, and resumable work.
 8. **Tool/skill system** — extensible capabilities and tool discovery.
@@ -67,3 +67,19 @@ Everything else comes later.
 ## Repository status
 
 This repository is currently being initialized.
+
+
+## Editing boundary
+
+The first editing layer is intentionally conservative:
+
+- edits are limited to files inside the workspace
+- the complete pre-edit file hash must match the model's expected hash
+- replacements are exact text matches, not fuzzy edits
+- exactly one match is required by default
+- callers can explicitly request a different exact replacement count
+- files above the configured size limit are rejected
+- changes are written atomically through a temporary file and rename
+- the result reports before/after SHA-256 hashes and replacement count
+
+This gives Vexis a verifiable edit primitive before we build larger patch generation or autonomous repair behavior.
