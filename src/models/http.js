@@ -6,7 +6,7 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_MAX_RETRIES = 2;
 
 function trimSlash(value) {
-  return String(value).replace(/\\/+$/, "");
+  return String(value).replace(/\/+$/, "");
 }
 
 function parseJson(text) {
