@@ -41,7 +41,7 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 11. **Real model runtime** — provider/model abstraction foundation. **Implemented**
 12. **Multi-provider runtime** — native provider adapters, profiles, capabilities, and provider registry. **Implemented**
 13. **Streaming + rich tool calling** — streaming events, structured outputs, and richer tool semantics.
-14. **Context intelligence** — context selection, compression, and token budgeting.
+14. **Context intelligence** — context selection, compression, token budgeting, and intelligent refresh. **Implemented**
 15. **Planning engine** — explicit plans, decomposition, verification, and recovery.
 
 ## Stage 10 / Sector 1: Editor integration
