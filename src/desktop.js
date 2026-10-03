@@ -355,9 +355,21 @@ function sendJson(response, status, payload) {
   response.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "content-length": Buffer.byteLength(body),
-    "cache-control": "no-store"
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff"
   });
   response.end(body);
+}
+
+function sendHtml(response, html) {
+  response.writeHead(200, {
+    "content-type": "text/html; charset=utf-8",
+    "content-length": Buffer.byteLength(html),
+    "cache-control": "no-store",
+    "x-content-type-options": "nosniff",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'"
+  });
+  response.end(html);
 }
 
 async function readJson(request) {
@@ -400,8 +412,12 @@ export function createDesktop({
     const url = new URL(request.url || "/", "http://localhost");
 
     if (request.method === "GET" && url.pathname === "/") {
-      response.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
-      response.end(DESKTOP_HTML);
+      sendHtml(response, DESKTOP_HTML);
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/health") {
+      sendJson(response, 200, { status: "ok", service: "vexis-desktop" });
       return;
     }
 
