@@ -37,10 +37,23 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 7. **Persistent task state** — plans, checkpoints, and resumable work. **Implemented**
 8. **Tool/skill system** — extensible capabilities and tool discovery. **Implemented**
 9. **Interactive CLI** — polished terminal experience. **Sectors 1, 2, and 3 implemented**
-10. **Editor integration** — IDE/editor workflow.
+10. **Editor integration** — IDE/editor workflow. **Sector 1 implemented**
 11. **Multi-model runtime** — provider/model abstraction.
 12. **Safety and permissions** — approvals, sandboxing, limits, audit trail.
 13. **Advanced agentic workflows** — parallel work, sub-agents, background tasks, and long-running jobs.
+
+## Stage 10 / Sector 1: Editor integration
+
+The first editor layer integrates the existing workspace primitives into the desktop shell:
+
+- browses the bounded workspace file tree
+- opens UTF-8 text files through the existing filesystem read boundary
+- presents an editable workspace surface without exposing arbitrary filesystem APIs
+- saves through the existing hash-guarded exact replacement primitive
+- rejects stale saves when the file changed after it was opened
+- keeps editor state in the browser UI while the source of truth remains the workspace files
+
+This is intentionally a first editor integration slice rather than a full IDE. Syntax intelligence, language services, richer diffs, tabs, search/replace, and deeper editor automation can be added as later Stage 10 sectors without weakening the existing filesystem/editing boundaries.
 
 ## Current safety boundary
 
