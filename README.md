@@ -33,7 +33,7 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 3. **Command execution** — run approved development commands without invoking a shell. **Implemented**
 4. **Codebase understanding** — bounded structural project inspection and context selection. **Implemented**
 5. **Editing loop** — propose/apply changes and verify them with hash-guarded exact replacements. **Implemented**
-6. **Test/debug loop** — run tests, inspect failures, repair, repeat.
+6. **Test/debug loop** — run tests, inspect failures, repair, repeat. **Implemented**
 7. **Persistent task state** — plans, checkpoints, and resumable work.
 8. **Tool/skill system** — extensible capabilities and tool discovery.
 9. **Interactive CLI** — polished terminal experience.
@@ -83,3 +83,17 @@ The first editing layer is intentionally conservative:
 - the result reports before/after SHA-256 hashes and replacement count
 
 This gives Vexis a verifiable edit primitive before we build larger patch generation or autonomous repair behavior.
+
+
+## Test verification boundary
+
+Stage 6 adds a structured verification primitive:
+
+- reads the workspace's `package.json` test script
+- selects npm, pnpm, yarn, or bun from `packageManager` when declared
+- runs the package manager's `test` command through the existing controlled command layer
+- returns `passed`, `failed`, or `unavailable` without throwing for ordinary test failures
+- preserves exit code, signal, timeout, output-limit, duration, and bounded stdout/stderr
+- returns concise diagnostics so the agent can inspect a failure and decide whether to edit and retest
+
+The repair/retest behavior is intentionally model-driven: the existing agent kernel already supports repeated tool calls, while this stage supplies a deterministic verification observation. Broader test discovery for Python, Rust, Go, and other ecosystems will be added as separate capabilities rather than hidden inside one oversized runner.
