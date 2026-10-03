@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createCommandTool } from "../src/tools/command.js";
 import { createTestTool } from "../src/tools/test.js";
 
 async function createWorkspace() {
@@ -33,10 +32,29 @@ test("runs the declared npm test script and returns structured diagnostics", asy
     });
     await writeScript(workspace, "pass.js", "process.stdout.write('verification ok');");
 
-    const command = createCommandTool({ workspace });
+    const calls = [];
+    const command = {
+      execute: async (input) => {
+        calls.push(input);
+        return {
+          ok: true,
+          exitCode: 0,
+          signal: null,
+          timedOut: false,
+          outputLimitReached: false,
+          stdout: "verification ok",
+          stderr: "",
+          stdoutTruncated: false,
+          stderrTruncated: false,
+          durationMs: 1
+        };
+      }
+    };
     const tool = createTestTool({ workspace, command });
 
     const result = await tool.execute();
+
+    assert.deepEqual(calls, [{ command: "npm", args: ["test"], timeout_ms: 120000 }]);
 
     assert.equal(result.status, "passed");
     assert.deepEqual(result.command, ["npm", "test"]);
@@ -60,10 +78,29 @@ test("reports a failing test command without throwing", async () => {
     });
     await writeScript(workspace, "fail.js", "process.stderr.write('failure detail'); process.exit(2);");
 
-    const command = createCommandTool({ workspace });
+    const calls = [];
+    const command = {
+      execute: async (input) => {
+        calls.push(input);
+        return {
+          ok: false,
+          exitCode: 2,
+          signal: null,
+          timedOut: false,
+          outputLimitReached: false,
+          stdout: "",
+          stderr: "failure detail",
+          stdoutTruncated: false,
+          stderrTruncated: false,
+          durationMs: 1
+        };
+      }
+    };
     const tool = createTestTool({ workspace, command });
 
     const result = await tool.execute();
+
+    assert.deepEqual(calls, [{ command: "npm", args: ["test"], timeout_ms: 120000 }]);
 
     assert.equal(result.status, "failed");
     // npm propagates lifecycle failures as exit code 1 on Windows, while\n    // Unix npm versions preserve the script exit code in this fixture.\n    const expectedExitCode = process.platform === "win32" ? 1 : 2;\n    assert.equal(result.exit_code, expectedExitCode);
@@ -83,7 +120,7 @@ test("reports unavailable verification when no test script exists", async () => 
       scripts: {}
     });
 
-    const command = createCommandTool({ workspace });
+    const command = { execute: async () => { throw new Error("should not execute"); } };
     const tool = createTestTool({ workspace, command });
 
     const result = await tool.execute();
