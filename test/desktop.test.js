@@ -116,3 +116,38 @@ test("desktop serializes concurrent task execution", async () => {
     await desktop.stop();
   }
 });
+
+test("desktop continues accepting tasks after an agent failure", async () => {
+  let calls = 0;
+  const desktop = createDesktop({
+    agent: {
+      run: async task => {
+        calls += 1;
+        if (task === "fail") throw new Error("boom");
+        return { output: task };
+      }
+    },
+    registry
+  });
+  const address = await desktop.start();
+  try {
+    const failed = await json(address.url + "api/task", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ task: "fail" })
+    });
+    assert.equal(failed.response.status, 500);
+    assert.equal(failed.body.error, "boom");
+
+    const recovered = await json(address.url + "api/task", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ task: "recover" })
+    });
+    assert.equal(recovered.response.status, 200);
+    assert.equal(recovered.body.output, "recover");
+    assert.equal(calls, 2);
+  } finally {
+    await desktop.stop();
+  }
+});
