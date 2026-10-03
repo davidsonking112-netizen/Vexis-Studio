@@ -69,3 +69,44 @@ test("profile selection resolves named model configurations", () => {
   });
   assert.equal(model.describe().provider, "local");
 });
+
+
+test("anthropic streaming adapter emits text and tool events", async () => {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      const events = [
+        'data: {"type":"message_start","message":{"usage":{"input_tokens":4}}}\n\n',
+        'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n',
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}\n\n',
+        'data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"tool_1","name":"inspect","input":{}}}\n\n',
+        'data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"path\\":\\"src\\"}"}}\n\n',
+        'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":3}}\n\n',
+        'data: {"type":"message_stop"}\n\n'
+      ];
+      for (const event of events) controller.enqueue(encoder.encode(event));
+      controller.close();
+    }
+  });
+
+  const model = new AnthropicModel({
+    apiKey: "key",
+    model: "claude-test",
+    fetchImpl: async (_url, options) => {
+      assert.equal(JSON.parse(options.body).stream, true);
+      return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+    }
+  });
+
+  const events = [];
+  for await (const event of model.nextStream({
+    messages: [{ role: "user", content: "inspect" }],
+    toolDefinitions: [{ name: "inspect" }]
+  })) events.push(event);
+
+  assert.equal(events.filter(event => event.type === "text_delta").map(event => event.delta).join(""), "Hello");
+  const complete = events.at(-1);
+  assert.equal(complete.type, "complete");
+  assert.equal(complete.response.type, "tool_calls");
+  assert.deepEqual(complete.response.calls[0].input, { path: "src" });
+});
