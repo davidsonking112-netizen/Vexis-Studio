@@ -192,3 +192,49 @@ test("agent injects bounded context before each model turn and refreshes it afte
   assert.ok(calls.some(call => call.kind === "invalidate"));
   assert.equal(calls.filter(call => call.kind === "build").length, 2);
 });
+
+
+test("agent creates an execution plan before acting when planning is enabled", async () => {
+  const events = [];
+  const planningEngine = {
+    async create(task) {
+      assert.equal(task, "implement feature");
+      return {
+        plan_id: "plan-1",
+        summary: "Inspect then implement.",
+        goals: ["Feature works."],
+        risks: [],
+        completion: ["Tests pass."],
+        steps: [{
+          id: "inspect",
+          title: "Inspect",
+          objective: "Inspect the affected code.",
+          dependencies: [],
+          files: ["src/example.js"],
+          verification: ["Run tests."],
+          acceptance: ["Relevant code identified."],
+          priority: "high"
+        }]
+      };
+    }
+  };
+  const modelMessages = [];
+  const model = {
+    async next({ messages }) {
+      modelMessages.push(messages);
+      return { type: "final", content: "done" };
+    }
+  };
+
+  const agent = new Agent({
+    model,
+    planningEngine,
+    onEvent: event => events.push(event)
+  });
+
+  const result = await agent.run("implement feature");
+  assert.equal(result.output, "done");
+  assert.ok(events.some(event => event.type === "plan_created"));
+  assert.match(modelMessages[0][0].content, /VEXIS EXECUTION PLAN/);
+  assert.match(modelMessages[0][0].content, /plan-1/);
+});
