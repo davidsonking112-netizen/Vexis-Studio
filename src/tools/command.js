@@ -20,18 +20,26 @@ const DEFAULT_ALLOWED_COMMANDS = new Set([
 ]);
 
 function commandName(command) {
-  return path.basename(command).toLowerCase().replace(/\\.(?:exe|cmd|bat)$/i, "");
+  return path.basename(command).toLowerCase().replace(/\.(?:exe|cmd|bat)$/i, "");
 }
 
-function spawnCommand(command) {
-  if (process.platform !== "win32") return command;
-
-  const name = commandName(command);
-  if (name === "npm" || name === "npx" || name === "pnpm" || name === "yarn" || name === "bun") {
-    return `${name}.cmd`;
+function resolveSpawn(command, args) {
+  if (process.platform !== "win32") {
+    return { command, args };
   }
 
-  return command;
+  const name = commandName(command);
+
+  // Windows .cmd shims require a shell when spawned directly.
+  // Keep shell:false by invoking npm/npx through Node's bundled CLI entry point.
+  if (name === "npm" || name === "npx") {
+    const nodeDir = path.dirname(process.execPath);
+    const cliName = name === "npm" ? "npm-cli.js" : "npx-cli.js";
+    const cliPath = path.join(nodeDir, "node_modules", "npm", "bin", cliName);
+    return { command: process.execPath, args: [cliPath, ...args] };
+  }
+
+  return { command, args };
 }
 
 function appendOutput(state, chunk, maxOutputBytes) {
@@ -120,7 +128,8 @@ export function createCommandTool({
         let timedOut = false;
         let outputLimitReached = false;
 
-        const child = spawn(spawnCommand(command), args, {
+        const spawned = resolveSpawn(command, args);
+        const child = spawn(spawned.command, spawned.args, {
           cwd: root,
           shell: false,
           windowsHide: true,
