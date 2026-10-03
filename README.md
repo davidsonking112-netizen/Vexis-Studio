@@ -44,6 +44,7 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 14. **Context intelligence** — context selection, compression, token budgeting, and intelligent refresh. **Implemented**
 15. **Planning engine** — explicit plans, decomposition, verification, dependency graphs, persistence, and recovery. **Implemented**
 16. **Agent memory** — bounded structured memory, retrieval, provenance, deduplication, and durable agent learning. **Implemented**
+17. **Repository intelligence** — bounded symbol indexing, local dependency graphs, reverse dependencies, structural search, and refreshable repository analysis. **Implemented**
 
 ## Stage 10 / Sector 1: Editor integration
 
@@ -401,6 +402,27 @@ High-value failures are recorded automatically when tools fail, while successful
 The memory subsystem is provider-independent and does not persist model credentials or raw provider transcripts.
 
 Stage 16 is considered complete only when persistence, retrieval, deduplication, bounds, agent integration, explicit tool access, and automated verification remain coherent together.
+## Stage 17 repository intelligence
+
+Stage 17 gives Vexis a structural model of the repository rather than relying only on raw file retrieval.
+
+The repository intelligence engine provides:
+
+- bounded indexing of supported source files
+- function, class, interface, type, variable, struct, trait, and enum symbol extraction
+- source locations and export metadata
+- local import/require/include/module dependency edges
+- reverse dependency lookup
+- symbol search by name, kind, or file
+- refreshable cached indexes
+- dependency/build directory exclusion
+- strict file-count, byte, and symbol limits
+- provider-independent results exposed through the `repository_intelligence` tool
+
+The Agent receives a bounded repository-intelligence snapshot before model turns and invalidates the structural index after tool execution so edits cannot silently leave the model working from a stale graph.
+
+This is intentionally a lightweight structural index rather than a language-server replacement. Later editor/LSP stages can add compiler-grade semantics without coupling the core agent runtime to a particular language server.
+
 
 ## Stage 15 planning engine
 
