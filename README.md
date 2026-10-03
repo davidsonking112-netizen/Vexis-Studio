@@ -28,9 +28,9 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 
 ## Initial staged roadmap
 
-1. **Agent kernel** — a minimal model → tool → observation loop.
-2. **Filesystem tools** — read, list, search, and write project files.
-3. **Command execution** — run shell commands with controlled execution.
+1. **Agent kernel** — a minimal model → tool → observation loop. **Implemented**
+2. **Filesystem tools** — controlled listing and reading inside a workspace. **Implemented**
+3. **Command execution** — run approved development commands without invoking a shell. **Implemented**
 4. **Codebase understanding** — structured project inspection and context selection.
 5. **Editing loop** — propose/apply changes and verify them.
 6. **Test/debug loop** — run tests, inspect failures, repair, repeat.
@@ -41,6 +41,20 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 11. **Multi-model runtime** — provider/model abstraction.
 12. **Safety and permissions** — approvals, sandboxing, limits, audit trail.
 13. **Advanced agentic workflows** — parallel work, sub-agents, background tasks, and long-running jobs.
+
+## Current safety boundary
+
+Vexis command execution currently:
+
+- runs with the workspace as its working directory
+- does not invoke a shell
+- uses an executable allowlist
+- supports explicit approval callbacks
+- enforces execution timeouts
+- bounds captured stdout/stderr
+- reports exit codes, signals, timeouts, and truncation
+
+This is a **process-level policy boundary, not an OS sandbox**. Commands such as package managers can themselves execute arbitrary project scripts. Strong isolation will be addressed in the later safety/permissions stage.
 
 ## First milestone
 
