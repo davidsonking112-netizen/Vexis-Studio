@@ -4,6 +4,7 @@ import { createCommandTool, toAgentCommandTool } from "./tools/command.js";
 import { createCodebaseTool, toAgentCodebaseTool } from "./tools/codebase.js";
 import { createEditTool, toAgentEditTool } from "./tools/edit.js";
 import { createTestTool, toAgentTestTool } from "./tools/test.js";
+import { createTaskStateTool, toAgentTaskStateTool } from "./tools/task_state.js";
 
 const workspace = process.cwd();
 
@@ -12,13 +13,15 @@ const command = createCommandTool({ workspace, timeoutMs: 120_000 });
 const codebase = createCodebaseTool({ workspace, filesystem });
 const edit = createEditTool({ workspace, filesystem });
 const testTool = createTestTool({ workspace, command });
+const taskState = createTaskStateTool({ workspace });
 
 const tools = {
   ...toAgentTools(filesystem),
   ...toAgentCommandTool(command),
   ...toAgentCodebaseTool(codebase),
   ...toAgentEditTool(edit),
-  ...toAgentTestTool(testTool)
+  ...toAgentTestTool(testTool),
+  ...toAgentTaskStateTool(taskState)
 };
 
 const model = {
