@@ -443,7 +443,7 @@ function renderEditorIntelligence(result) {
   activity.innerHTML=activityText;
 }
 document.getElementById("editor-diagnostics").addEventListener("change", event => { const diagnostic=editorCurrent?.intelligence?.diagnostics?.[Number(event.target.value)]; if(!diagnostic) return; const code=document.getElementById("editor-code"); const lines=code.value.split("\n"); let offset=0; for(let i=0;i<diagnostic.line-1;i++) offset+=lines[i].length+1; offset+=Math.max(0,diagnostic.column-1); code.focus(); code.setSelectionRange(offset,Math.min(code.value.length,offset+1)); code.scrollTop=Math.max(0,(diagnostic.line-2)*20); updateEditorLocation(); });
-function analyzeEditorCurrent() {
+async function analyzeEditorCurrent() {
   if(!editorCurrent) return;
   const requestId=++editorIntelligenceRequest;
   document.getElementById("editor-intelligence").textContent="Analyzing…";
@@ -743,6 +743,27 @@ document.getElementById("editor-replace-all").addEventListener("click",replaceAl
 document.getElementById("editor-find-input").addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();selectEditorMatch(event.shiftKey?-1:1);}if(event.key==="Escape")closeEditorFind();});
 document.getElementById("editor-replace-input").addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();replaceEditorMatch();}if(event.key==="Escape")closeEditorFind();});
 document.getElementById("editor-save").addEventListener("click", saveEditorFile);
+document.getElementById("editor-code").addEventListener("keydown", event => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+    event.preventDefault();
+    void saveEditorFile();
+    return;
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+    event.preventDefault();
+    openEditorFind();
+    return;
+  }
+  if (event.key === "Tab") {
+    event.preventDefault();
+    const code = event.currentTarget;
+    const start = code.selectionStart;
+    const end = code.selectionEnd;
+    const indent = "  ";
+    code.setRangeText(indent, start, end, "end");
+    code.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+});
 document.getElementById("editor-save-all").addEventListener("click", saveAllEditorFiles);
 document.getElementById("diff-close").addEventListener("click", closeEditorDiff);
 document.getElementById("diff-save").addEventListener("click", async () => { closeEditorDiff(); await saveEditorFile(); });
