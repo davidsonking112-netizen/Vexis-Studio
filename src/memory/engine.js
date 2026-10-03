@@ -236,6 +236,16 @@ export function createAgentMemory({
     return { removed: before - store.entries.length, remaining: store.entries.length };
   }
 
+  async function stats() {
+    const store = await readStore();
+    return {
+      entries: store.entries.length,
+      max_entries: maxEntries,
+      bytes: Buffer.byteLength(JSON.stringify(store), "utf8"),
+      max_bytes: maxBytes
+    };
+  }
+
   async function clear() {
     await writeStore({ version: VERSION, entries: [] });
     return { removed: true };
@@ -247,22 +257,14 @@ export function createAgentMemory({
     recall,
     forget,
     clear,
-    async stats() {
-      const store = await readStore();
-      return {
-        entries: store.entries.length,
-        max_entries: maxEntries,
-        bytes: Buffer.byteLength(JSON.stringify(store), "utf8"),
-        max_bytes: maxBytes
-      };
-    },
+    stats,
     execute: async (input = {}) => {
       const action = input.action ?? "recall";
       if (action === "remember") return { status: "ok", entry: await remember(input) };
       if (action === "recall") return { status: "ok", ...(await recall(input)) };
       if (action === "forget") return { status: "ok", ...(await forget(input)) };
       if (action === "clear") return { status: "ok", ...(await clear()) };
-      if (action === "stats") return { status: "ok", ...(await this.stats()) };
+      if (action === "stats") return { status: "ok", ...(await stats()) };
       throw new Error(`Unknown memory action: ${action}`);
     }
   };
