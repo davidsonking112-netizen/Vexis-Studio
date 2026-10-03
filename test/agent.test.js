@@ -146,3 +146,49 @@ test("agent executes multiple streaming tool calls concurrently and preserves re
   assert.deepEqual(started, ["slow", "fast"]);
   assert.equal(result.output, "done");
 });
+
+
+test("agent injects bounded context before each model turn and refreshes it after tools", async () => {
+  const calls = [];
+  const contextEngine = {
+    async build(input) {
+      calls.push({ kind: "build", input });
+      return {
+        content: "### focus\\nsrc/agent.js",
+        tokens: 12,
+        budget: 100,
+        candidates: [{ path: "src/agent.js", score: 99, tokens: 12, compressed: false }],
+        truncated: false
+      };
+    },
+    invalidate() {
+      calls.push({ kind: "invalidate" });
+    }
+  };
+
+  const modelMessages = [];
+  const model = {
+    describe() { return { provider: "test", model: "test" }; },
+    async next({ messages }) {
+      modelMessages.push(messages);
+      if (modelMessages.length === 1) {
+        return { type: "tool_call", name: "echo", input: { value: "ok" } };
+      }
+      return { type: "final", content: "done" };
+    }
+  };
+
+  const agent = new Agent({
+    model,
+    tools: { echo: async ({ value }) => value },
+    contextEngine
+  });
+
+  const result = await agent.run("inspect the agent context");
+  assert.equal(result.output, "done");
+  assert.equal(modelMessages[0][0].role, "system");
+  assert.match(modelMessages[0][0].content, /src\/agent\.js/);
+  assert.equal(modelMessages[1][0].role, "system");
+  assert.ok(calls.some(call => call.kind === "invalidate"));
+  assert.equal(calls.filter(call => call.kind === "build").length, 2);
+});
