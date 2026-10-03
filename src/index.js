@@ -5,6 +5,7 @@ import { createCodebaseTool, toAgentCodebaseTool } from "./tools/codebase.js";
 import { createEditTool, toAgentEditTool } from "./tools/edit.js";
 import { createTestTool, toAgentTestTool } from "./tools/test.js";
 import { createTaskStateTool, toAgentTaskStateTool } from "./tools/task_state.js";
+import { createToolRegistry } from "./tools/registry.js";
 
 const workspace = process.cwd();
 
@@ -15,14 +16,16 @@ const edit = createEditTool({ workspace, filesystem });
 const testTool = createTestTool({ workspace, command });
 const taskState = createTaskStateTool({ workspace });
 
-const tools = {
-  ...toAgentTools(filesystem),
+const registry = createToolRegistry({
+  ...Object.fromEntries(Object.entries(filesystem).map(([name, definition]) => [name, definition])),
   ...toAgentCommandTool(command),
   ...toAgentCodebaseTool(codebase),
   ...toAgentEditTool(edit),
   ...toAgentTestTool(testTool),
   ...toAgentTaskStateTool(taskState)
-};
+});
+
+const tools = registry.toAgentTools();
 
 const model = {
   async next({ messages, tools: availableTools }) {
