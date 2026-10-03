@@ -78,3 +78,20 @@ test("respects the file inspection limit", async () => {
     await fs.rm(workspace, { recursive: true, force: true });
   }
 });
+
+test("discovers entry points relative to a requested subdirectory", async () => {
+  const workspace = await createWorkspace();
+
+  try {
+    await fs.mkdir(path.join(workspace, "src"));
+    await fs.writeFile(path.join(workspace, "src", "index.js"), "export default 1;");
+
+    const filesystem = createFilesystemTools({ workspace });
+    const tool = createCodebaseTool({ workspace, filesystem });
+    const result = await tool.execute({ path: "src" });
+
+    assert.deepEqual(result.entryPoints, [{ path: "src/index.js" }]);
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
