@@ -1,5 +1,5 @@
 const DEFAULT_MAX_TOTAL_TOKENS = 48_000;
-const DEFAULT_MAX_INPUT_TOKENS = 12_000;
+const DEFAULT_MAX_INPUT_TOKENS = 20_000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 6_000;
 
 function positiveInteger(value, name) {
