@@ -338,3 +338,37 @@ The runtime now provides:
 Streaming retries are intentionally limited to failures before a response stream has been consumed. Once model output has begun, Vexis does not silently replay a partially observed generation.
 
 Stage 13 is considered complete only when the provider adapters, agent execution semantics, event contract, and automated verification remain coherent together.
+
+
+## Stage 14 context intelligence
+
+Stage 14 adds a dedicated context-intelligence layer between the Agent and workspace tools. The goal is to give each model turn the smallest useful slice of the repository rather than dumping the workspace into the prompt.
+
+The context engine provides:
+
+- deterministic token estimation and hard context budgets
+- relevance scoring using task terms, paths, content matches, explicit focus, priority, and recency
+- bounded repository snapshots with ignored dependency/build directories excluded
+- targeted loading of important manifests and relevant source files
+- explicit focus and changed-file prioritization
+- bounded recent tool observations and persistent task-state context
+- deterministic compression that preserves both the beginning and end of oversized context
+- stable candidate metadata so the UI/telemetry can explain what context was selected
+- cached repository structure with explicit invalidation after tool execution
+- an agent-level context refresh before every model turn
+- no provider-specific coupling: the engine produces ordinary model messages and works with streaming and non-streaming providers
+
+The context engine is intentionally deterministic in this stage. Model-based summarization, semantic embeddings, repository symbol graphs, dependency graphs, Git-aware change analysis, and richer semantic retrieval remain separate capabilities that can be layered onto this contract without replacing the budgeting and selection core.
+
+### Context contract
+
+Each context build returns a versioned object containing:
+
+- content — the assembled model-facing context
+- candidates — selected sources with score, token cost, and compression metadata
+- tokens / budget — the estimated cost and enforced budget
+- truncated — whether the repository or candidate set was bounded
+
+The Agent emits a context_update event before each model turn. After tool execution the context snapshot is invalidated so the next turn sees fresh workspace structure.
+
+Stage 14 is considered complete only when context selection, budgeting, compression, agent integration, and automated verification remain coherent together.
