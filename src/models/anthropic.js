@@ -34,7 +34,26 @@ function sleep(ms, signal) {
 
 function convertMessages(messages) {
   const result = [];
+  let pendingToolResults = [];
+
+  const flushToolResults = () => {
+    if (!pendingToolResults.length) return;
+    result.push({ role: "user", content: pendingToolResults });
+    pendingToolResults = [];
+  };
+
   for (const message of messages) {
+    if (message.role === "tool") {
+      pendingToolResults.push({
+        type: "tool_result",
+        tool_use_id: message.toolCallId || message.name,
+        content: String(message.content ?? "")
+      });
+      continue;
+    }
+
+    flushToolResults();
+
     if (message.role === "user") {
       result.push({ role: "user", content: String(message.content ?? "") });
     } else if (message.role === "assistant") {
@@ -52,17 +71,10 @@ function convertMessages(messages) {
         });
       }
       result.push({ role: "assistant", content: blocks.length ? blocks : [{ type: "text", text: "" }] });
-    } else if (message.role === "tool") {
-      result.push({
-        role: "user",
-        content: [{
-          type: "tool_result",
-          tool_use_id: message.toolCallId || message.name,
-          content: String(message.content ?? "")
-        }]
-      });
     }
   }
+
+  flushToolResults();
   return { system: [], messages: result };
 }
 
