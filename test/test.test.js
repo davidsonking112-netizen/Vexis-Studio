@@ -17,6 +17,10 @@ async function writePackage(workspace, packageJson) {
   );
 }
 
+async function writeScript(workspace, name, content) {
+  await fs.writeFile(path.join(workspace, name), content, "utf8");
+}
+
 test("runs the declared npm test script and returns structured diagnostics", async () => {
   const workspace = await createWorkspace();
 
@@ -24,9 +28,10 @@ test("runs the declared npm test script and returns structured diagnostics", asy
     await writePackage(workspace, {
       name: "fixture",
       scripts: {
-        test: "node test/fixtures/npm-pass.js"
+        test: "node pass.js"
       }
     });
+    await writeScript(workspace, "pass.js", "process.stdout.write('verification ok');");
 
     const command = createCommandTool({ workspace });
     const tool = createTestTool({ workspace, command });
@@ -50,9 +55,10 @@ test("reports a failing test command without throwing", async () => {
     await writePackage(workspace, {
       name: "fixture",
       scripts: {
-        test: "node test/fixtures/npm-fail.js"
+        test: "node fail.js"
       }
     });
+    await writeScript(workspace, "fail.js", "process.stderr.write('failure detail'); process.exit(2);");
 
     const command = createCommandTool({ workspace });
     const tool = createTestTool({ workspace, command });
