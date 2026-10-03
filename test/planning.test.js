@@ -73,8 +73,10 @@ test("planning engine generates, validates, and persists a rich plan", async () 
   const root = await workspace();
   try {
     const taskState = createTaskStateTool({ workspace: root });
+    let request;
     const model = {
-      async next() {
+      async next(input) {
+        request = input;
         return {
           type: "final",
           content: JSON.stringify(samplePlan())
@@ -90,6 +92,7 @@ test("planning engine generates, validates, and persists a rich plan", async () 
     const plan = await engine.create("Implement a feature");
 
     assert.equal(plan.steps.length, 2);
+    assert.equal(request.maxTokens, 4096);
     assert.equal(plan.steps[1].dependencies[0], "inspect");
 
     const persisted = await taskState.execute({ action: "read" });
