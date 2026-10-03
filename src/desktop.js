@@ -558,6 +558,39 @@ export function createDesktop({
       return;
     }
 
+    if (request.method === "GET" && url.pathname.startsWith("/api/events/")) {
+      const taskId = decodeURIComponent(url.pathname.slice("/api/events/".length));
+      const state = tasks.get(taskId);
+      if (!state) {
+        sendJson(response, 404, { error: "Task not found" });
+        return;
+      }
+      response.writeHead(200, {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-store",
+        "connection": "keep-alive",
+        "x-content-type-options": "nosniff"
+      });
+      for (const event of state.events) response.write("data: " + JSON.stringify(event) + "\n\n");
+      state.clients.add(response);
+      request.on("close", () => state.clients.delete(response));
+      if (state.done) response.end();
+      return;
+    }
+
+    if (request.method === "DELETE" && url.pathname.startsWith("/api/task/")) {
+      const taskId = decodeURIComponent(url.pathname.slice("/api/task/".length));
+      const state = tasks.get(taskId);
+      if (!state) {
+        sendJson(response, 404, { error: "Task not found" });
+        return;
+      }
+      state.controller.abort();
+      publish(taskId, { type: "task_cancel_requested" });
+      sendJson(response, 202, { status: "cancellation_requested", id: taskId });
+      return;
+    }
+
     if (request.method === "POST" && url.pathname === "/api/task") {
       try {
         const body = await readJson(request);
