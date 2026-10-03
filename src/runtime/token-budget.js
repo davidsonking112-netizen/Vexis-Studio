@@ -1,6 +1,6 @@
 const DEFAULT_MAX_TOTAL_TOKENS = 48_000;
-const DEFAULT_MAX_INPUT_TOKENS = 20_000;
-const DEFAULT_MAX_OUTPUT_TOKENS = 6_000;
+const DEFAULT_MAX_INPUT_TOKENS = 32_000;
+const DEFAULT_MAX_OUTPUT_TOKENS = 8_000;
 
 function positiveInteger(value, name) {
   if (!Number.isInteger(value) || value < 1) throw new TypeError(name + " must be a positive integer");
