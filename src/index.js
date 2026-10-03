@@ -8,7 +8,7 @@ import { createTestTool, toAgentTestTool } from "./tools/test.js";
 const workspace = process.cwd();
 
 const filesystem = createFilesystemTools({ workspace });
-const command = createCommandTool({ workspace });
+const command = createCommandTool({ workspace, timeoutMs: 120_000 });
 const codebase = createCodebaseTool({ workspace, filesystem });
 const edit = createEditTool({ workspace, filesystem });
 
