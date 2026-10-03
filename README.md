@@ -37,10 +37,12 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 7. **Persistent task state** — plans, checkpoints, and resumable work. **Implemented**
 8. **Tool/skill system** — extensible capabilities and tool discovery. **Implemented**
 9. **Interactive CLI** — polished terminal experience. **Sectors 1, 2, and 3 implemented**
-10. **Editor integration** — IDE/editor workflow. **Sector 1 implemented**
-11. **Multi-model runtime** — provider/model abstraction.
-12. **Safety and permissions** — approvals, sandboxing, limits, audit trail.
-13. **Advanced agentic workflows** — parallel work, sub-agents, background tasks, and long-running jobs.
+10. **Editor integration** — IDE/editor workflow. **Implemented**
+11. **Real model runtime** — provider/model abstraction foundation. **Implemented**
+12. **Multi-provider runtime** — native provider adapters, profiles, capabilities, and provider registry. **Implemented**
+13. **Streaming + rich tool calling** — streaming events, structured outputs, and richer tool semantics.
+14. **Context intelligence** — context selection, compression, and token budgeting.
+15. **Planning engine** — explicit plans, decomposition, verification, and recovery.
 
 ## Stage 10 / Sector 1: Editor integration
 
@@ -257,3 +259,61 @@ VEXIS_MODEL_BASE_URL=https://api.openai.com/v1
 `VEXIS_MODEL_BASE_URL` can point at another OpenAI-compatible service, including a local inference server. The transport deliberately remains generic; native provider-specific adapters, streaming, richer tool-call semantics, and multi-provider discovery are Stage 12/13 work.
 
 Vexis does not store provider credentials in the repository or task state.
+
+
+## Stage 12 multi-provider runtime
+
+Stage 12 promotes the model boundary into a real provider architecture while keeping the agent and tools provider-independent.
+
+The runtime now provides:
+
+- a deterministic provider registry with capability metadata
+- native Anthropic message/tool translation alongside the OpenAI-compatible transport
+- named providers for OpenAI, Anthropic, Qwen, local inference, and generic OpenAI-compatible endpoints
+- provider-specific defaults without hard-coding credentials
+- explicit model profiles through `VEXIS_MODEL_PROFILES`
+- provider selection through runtime configuration or `VEXIS_PROVIDER`
+- normalized provider identity, model identity, endpoint, and capabilities through `model.describe()`
+- unified retry/error metadata across providers
+- injectable fetch implementations for deterministic adapter tests
+- provider selection without coupling the Agent to any provider SDK or wire format
+
+### Provider configuration
+
+Single-provider configuration remains simple:
+
+```bash
+VEXIS_PROVIDER=openai
+VEXIS_MODEL_API_KEY=...
+VEXIS_MODEL=gpt-5
+```
+
+Anthropic:
+
+```bash
+VEXIS_PROVIDER=anthropic
+ANTHROPIC_API_KEY=...
+VEXIS_MODEL=claude-sonnet-4-5
+```
+
+Qwen through its OpenAI-compatible endpoint:
+
+```bash
+VEXIS_PROVIDER=qwen
+DASHSCOPE_API_KEY=...
+VEXIS_MODEL=qwen-plus
+```
+
+Local inference:
+
+```bash
+VEXIS_PROVIDER=local
+VEXIS_MODEL=qwen3
+VEXIS_MODEL_BASE_URL=http://127.0.0.1:11434/v1
+```
+
+Named profiles can be supplied as JSON through `VEXIS_MODEL_PROFILES`, then selected with `modelConfig.profile` when constructing the runtime.
+
+Provider credentials are read from environment/runtime configuration and are never persisted into task state.
+
+Stage 12 deliberately does not add streaming yet. Streaming and richer tool semantics are isolated into Stage 13 so the provider adapters remain testable and the Agent contract stays stable.
