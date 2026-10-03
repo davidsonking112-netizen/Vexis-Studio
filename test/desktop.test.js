@@ -252,22 +252,21 @@ test("desktop streams agent events and supports cancellation", async () => {
   const address = await desktop.start();
   try {
     const id = "cancel-test";
-    const stream = await fetch(address.url + "api/events/" + id);
-    const reader = stream.body.getReader();
-    const first = new TextDecoder().decode((await reader.read()).value);
-    assert.match(first, /Task not found|/);
-
     const request = json(address.url + "api/task", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id, task: "long task" })
     });
     await started;
+    const stream = await fetch(address.url + "api/events/" + id);
     const cancelled = await json(address.url + "api/task/" + id, { method: "DELETE" });
     assert.equal(cancelled.response.status, 202);
     const result = await request;
     assert.equal(result.response.status, 200);
     assert.equal(result.body.status, "cancelled");
+    const streamText = await stream.text();
+    assert.match(streamText, /model_start/);
+    assert.match(streamText, /task_cancelled/);
   } finally {
     await desktop.stop();
   }
