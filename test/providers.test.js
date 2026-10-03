@@ -110,3 +110,12 @@ test("anthropic streaming adapter emits text and tool events", async () => {
   assert.equal(complete.response.type, "tool_calls");
   assert.deepEqual(complete.response.calls[0].input, { path: "src" });
 });
+
+
+test("all built-in provider adapters advertise the capabilities they implement", () => {
+  const registry = createDefaultProviderRegistry();
+  for (const provider of registry.list()) {
+    assert.equal(provider.capabilities.streaming, true, provider.name + " should support streaming");
+    assert.equal(provider.capabilities.toolCalling, true, provider.name + " should support tool calling");
+  }
+});
