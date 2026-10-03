@@ -53,7 +53,18 @@ The first editor layer integrates the existing workspace primitives into the des
 - rejects stale saves when the file changed after it was opened
 - keeps editor state in the browser UI while the source of truth remains the workspace files
 
-This is intentionally a first editor integration slice rather than a full IDE. Syntax intelligence, language services, richer diffs, tabs, search/replace, and deeper editor automation can be added as later Stage 10 sectors without weakening the existing filesystem/editing boundaries.
+### Sector 2: Multi-file editor state
+
+The editor now also supports:
+
+- multiple simultaneously open file tabs
+- independent in-memory buffers and pre-edit hashes per file
+- visible dirty/unsaved indicators
+- guarded switching and closing of files with unsaved changes
+- per-file Save and sequential Save all
+- continued stale-write protection for every individual save
+
+This remains intentionally lighter than a full IDE. Syntax intelligence, language services, richer diffs, search/replace, and deeper editor automation remain later Stage 10 work without weakening the filesystem/editing boundaries.
 
 ## Current safety boundary
 
