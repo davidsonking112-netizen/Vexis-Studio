@@ -691,6 +691,7 @@ export function createDesktop({
     if (request.method === "GET" && url.pathname === "/api/editor/files") {
       if (!filesystem?.list_files?.execute) { sendJson(response, 503, { error: "Editor filesystem is unavailable" }); return; }
       const result = await filesystem.list_files.execute({ path: ".", max_entries: 1000 });
+      result.entries = result.entries.filter(entry => entry.type === "file" && !entry.path.startsWith(".") && !entry.path.includes("/node_modules/"));
       sendJson(response, 200, result);
       return;
     }
