@@ -372,3 +372,4 @@ Each context build returns a versioned object containing:
 The Agent emits a context_update event before each model turn. After tool execution the context snapshot is invalidated so the next turn sees fresh workspace structure.
 
 Stage 14 is considered complete only when context selection, budgeting, compression, agent integration, and automated verification remain coherent together.
+
