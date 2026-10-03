@@ -38,6 +38,6 @@ export function normalizeModelResponse(response) {
     };
   }
 
-  throw new TypeError(`Unknown model response type: ${response.type}`);
+  if (response.type === "tool_calls") {\n    if (!Array.isArray(response.calls) || response.calls.length === 0) throw new TypeError("Model tool_calls requires calls");\n    return { type: "tool_calls", calls: response.calls.map(call => normalizeModelResponse({ ...call, type: "tool_call" })), usage: response.usage ?? null, provider: response.provider ?? null, model: response.model ?? null };\n  }\n\n  throw new TypeError(`Unknown model response type: ${response.type}`);
 }
 
