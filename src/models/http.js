@@ -27,7 +27,9 @@ function providerError(response, body, provider = "openai-compatible") {
   const error = new Error("Model provider request failed (" + response.status + "): " + detail);
   error.status = response.status;
   error.provider = provider;
-  error.retryable = response.status === 408 || response.status === 409 || response.status === 429 || response.status >= 500;
+  const retryAfter = Number(response.headers.get("retry-after"));
+  error.retryAfterMs = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter * 1000) : null;
+  error.retryable = response.status === 408 || response.status === 409 || response.status >= 500 || (response.status === 429 && error.retryAfterMs != null);
   return error;
 }
 
@@ -283,7 +285,8 @@ export class OpenAICompatibleModel {
           if (error?.name === "AbortError") throw new Error("Model request timed out after " + this.timeoutMs + "ms");
           lastError = error;
           if (!error?.retryable || attempt >= this.maxRetries) throw error;
-          await sleep(Math.min(250 * 2 ** attempt, 2_000), signal);
+          const delay = error.retryAfterMs ?? Math.min(250 * 2 ** attempt, 2_000);
+          await sleep(Math.min(Math.max(delay, 250), 30_000), signal);
         }
       }
 
