@@ -40,3 +40,4 @@ export function normalizeModelResponse(response) {
 
   throw new TypeError(`Unknown model response type: ${response.type}`);
 }
+
