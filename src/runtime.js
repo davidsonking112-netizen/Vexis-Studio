@@ -7,6 +7,7 @@ import { createCodebaseTool } from "./tools/codebase.js";
 import { createEditTool } from "./tools/edit.js";
 import { createTestTool } from "./tools/test.js";
 import { createTaskStateTool } from "./tools/task_state.js";
+import { createContextEngine } from "./context/engine.js";
 import { createToolRegistry } from "./tools/registry.js";
 
 export function createRuntime({
@@ -14,7 +15,8 @@ export function createRuntime({
   model = null,
   modelConfig = {},
   providerRegistry = createDefaultProviderRegistry(),
-  modelProfiles = loadModelProfiles()
+  modelProfiles = loadModelProfiles(),
+  contextConfig = {}
 } = {}) {
   const selectedModel = model || createConfiguredModel({
     ...modelConfig,
@@ -29,6 +31,7 @@ export function createRuntime({
   const edit = createEditTool({ workspace, filesystem });
   const testTool = createTestTool({ workspace, command });
   const taskState = createTaskStateTool({ workspace });
+  const contextEngine = createContextEngine({ workspace, filesystem, taskState, ...contextConfig });
   const registry = createToolRegistry({
     ...filesystem,
     run_command: command,
@@ -42,7 +45,8 @@ export function createRuntime({
   const agent = new Agent({
     model: selectedModel,
     tools,
-    toolDefinitions: registry.list()
+    toolDefinitions: registry.list(),
+    contextEngine
   });
 
   return {
@@ -54,6 +58,7 @@ export function createRuntime({
     filesystem,
     edit,
     codebase,
+    contextEngine,
     workspace
   };
 }
