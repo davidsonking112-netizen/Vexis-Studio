@@ -45,6 +45,7 @@ export function createProviderModel(config = {}) {
   const options = { ...normalized };
   delete options.provider;
   delete options.capabilities;
+  if (config.fetchImpl) options.fetchImpl = config.fetchImpl;
 
   let model;
   if (normalized.provider === "anthropic") {
