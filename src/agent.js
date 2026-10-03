@@ -1,5 +1,5 @@
 export class Agent {
-  constructor({ model, tools = {}, toolDefinitions = null, maxSteps = 20, onEvent = () => {} }) {
+  constructor({ model, tools = {}, toolDefinitions = null, contextEngine = null, maxSteps = 20, onEvent = () => {} }) {
     if (!model || typeof model.next !== "function") {
       throw new TypeError("model.next must be a function");
     }
@@ -10,17 +10,54 @@ export class Agent {
     this.model = model;
     this.tools = tools;
     this.toolDefinitions = toolDefinitions || Object.keys(tools).map(name => ({ name, description: "" }));
+    if (contextEngine && typeof contextEngine.build !== "function") {
+      throw new TypeError("contextEngine must provide build()");
+    }
+    this.contextEngine = contextEngine;
     this.maxSteps = maxSteps;
     this.onEvent = onEvent;
   }
 
-  async getModelResponse(messages, { signal, step, onEvent }) {
-    onEvent({ type: "model_start", step, messages });
+  async getModelResponse(messages, { task, signal, step, onEvent }) {
+    let modelMessages = messages;
+
+    if (this.contextEngine) {
+      const observations = messages
+        .filter(message => message?.role === "tool")
+        .slice(-8)
+        .map(message => ({
+          type: "observation",
+          path: message.name || "",
+          content: message.content || ""
+        }));
+
+      const context = await this.contextEngine.build({
+        task,
+        messages,
+        observations
+      });
+
+      modelMessages = [
+        { role: "system", content: context.content },
+        ...messages
+      ];
+
+      onEvent({
+        type: "context_update",
+        step,
+        tokens: context.tokens,
+        budget: context.budget,
+        candidates: context.candidates,
+        truncated: context.truncated
+      });
+    }
+
+    onEvent({ type: "model_start", step, messages: modelMessages });
 
     if (typeof this.model.nextStream === "function") {
       let response = null;
       for await (const event of this.model.nextStream({
-        messages,
+        messages: modelMessages,
         toolDefinitions: this.toolDefinitions,
         signal
       })) {
@@ -32,7 +69,7 @@ export class Agent {
     }
 
     return this.model.next({
-      messages,
+      messages: modelMessages,
       tools: Object.keys(this.tools),
       toolDefinitions: this.toolDefinitions,
       signal
@@ -102,6 +139,8 @@ export class Agent {
         content: JSON.stringify(observation)
       });
     }
+
+    if (this.contextEngine?.invalidate) this.contextEngine.invalidate();
   }
 
   async run(task, { signal, onEvent = this.onEvent } = {}) {
@@ -111,7 +150,7 @@ export class Agent {
     for (let step = 0; step < this.maxSteps; step++) {
       if (signal?.aborted) throw new Error("Task cancelled");
 
-      const response = await this.getModelResponse(messages, { signal, step, onEvent });
+      const response = await this.getModelResponse(messages, { task, signal, step, onEvent });
       onEvent({ type: "model_response", step, response });
 
       if (!response || typeof response !== "object") {
