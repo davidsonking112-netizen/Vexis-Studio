@@ -48,3 +48,13 @@ test("repository intelligence excludes dependency and build directories", async 
   const result = await intelligence.inspect({});
   assert.ok(!result.symbols.some(s => s.name === "bad"));
 });
+
+
+test("repository intelligence keeps dependency coverage after the symbol budget is reached", async () => {
+  const root = await workspace();
+  const filesystem = createFilesystemTools({ workspace: root });
+  const intelligence = createRepositoryIntelligence({ workspace: root, filesystem, maxSymbols: 1 });
+  const result = await intelligence.inspect({});
+  assert.equal(result.symbols, 1);
+  assert.ok(result.dependencies.some(d => d.from === "src/a.js" && d.to === "src/b.js"));
+});
