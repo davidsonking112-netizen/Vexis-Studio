@@ -41,7 +41,9 @@ export function createTuiState({ width = 80, height = 24 } = {}) {
     status: "idle",
     messages: [],
     exit: false,
-    notice: "Ready"
+    notice: "Ready",
+    history: [],
+    historyIndex: -1
   };
 }
 
@@ -83,12 +85,27 @@ export function handleTuiKey(state, key) {
     return { state: { ...state, exit: true, notice: "Exiting" }, submit: false };
   }
 
+  if (key.name === "up") {
+    if (!state.history.length) return { state, submit: false };
+    const index = state.historyIndex < 0 ? state.history.length - 1 : Math.max(0, state.historyIndex - 1);
+    const input = state.history[index];
+    return { state: { ...state, input, cursor: input.length, historyIndex: index }, submit: false };
+  }
+
+  if (key.name === "down") {
+    if (state.historyIndex < 0) return { state, submit: false };
+    const index = state.historyIndex + 1;
+    if (index >= state.history.length) return { state: { ...state, input: "", cursor: 0, historyIndex: -1 }, submit: false };
+    const input = state.history[index];
+    return { state: { ...state, input, cursor: input.length, historyIndex: index }, submit: false };
+  }
+
   if (key.name === "return" || key.name === "enter") {
     if (!state.input.trim() || state.status === "running") return { state, submit: false };
     const task = state.input.trim();
     return {
       state: {
-        ...appendMessage({ ...state, input: "", cursor: 0, status: "running", notice: "Running task" }, "user", task)
+        ...appendMessage({ ...state, input: "", cursor: 0, status: "running", notice: "Running task", history: [...state.history.filter(item => item !== task), task].slice(-50), historyIndex: -1 }, "user", task)
       },
       submit: true,
       task
@@ -174,6 +191,7 @@ export function createTui({
   let started = false;
   let keypressHandler;
   let resizeHandler;
+  let taskQueue = Promise.resolve();
 
   const write = () => output.write(renderTui(state));
 
@@ -186,7 +204,7 @@ export function createTui({
         state = appendMessage({ ...state, status: "idle", notice: "Ready" }, "system", tools.length
           ? tools.map(tool => `- ${tool.name}: ${tool.description}`).join("\n")
           : "No tools registered.");
-      } else if (task.startsWith("/discover")) {
+      } else if (task === "/discover" || task.startsWith("/discover ")) {
         const query = task.slice("/discover".length).trim();
         state = appendMessage({ ...state, status: "idle", notice: "Ready" }, "system", query
           ? (registry.discover(query).map(tool => `- ${tool.name}: ${tool.description}`).join("\n") || "No matching tools.")
@@ -197,7 +215,8 @@ export function createTui({
         state = renderResult(state, await agent.run(task));
       }
     } catch (error) {
-      state = appendMessage({ ...state, status: "idle", notice: "Error" }, "error", error.message);
+      const message = error instanceof Error ? error.message : String(error);
+      state = appendMessage({ ...state, status: "idle", notice: "Error" }, "error", message);
     }
     write();
     if (state.exit) stop();
@@ -207,7 +226,10 @@ export function createTui({
     const result = handleTuiKey(state, key);
     state = result.state;
     write();
-    if (result.submit) await executeTask(result.task);
+    if (result.submit) {
+      taskQueue = taskQueue.then(() => executeTask(result.task));
+      await taskQueue;
+    }
     return result;
   }
 

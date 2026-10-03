@@ -26,6 +26,7 @@ test("TUI state accepts text, edits it, and submits on Enter", () => {
   assert.equal(result.task, "h");
   assert.equal(result.state.status, "running");
   assert.equal(result.state.messages.at(-1).content, "h");
+  assert.deepEqual(result.state.history, ["h"]);
 });
 
 test("TUI renders bounded transcript and controls", () => {
@@ -75,4 +76,35 @@ test("Ctrl+C requests exit and stop restores terminal mode", () => {
   });
   const result = handleTuiKey(tui.getState(), { ctrl: true, name: "c" });
   assert.equal(result.state.exit, true);
+});
+
+
+test("TUI supports bounded command history", () => {
+  let state = createTuiState();
+  state = { ...state, history: ["first", "second"], historyIndex: -1 };
+  state = handleTuiKey(state, { name: "up" }).state;
+  assert.equal(state.input, "second");
+  state = handleTuiKey(state, { name: "up" }).state;
+  assert.equal(state.input, "first");
+  state = handleTuiKey(state, { name: "down" }).state;
+  assert.equal(state.input, "second");
+  state = handleTuiKey(state, { name: "down" }).state;
+  assert.equal(state.input, "");
+});
+
+test("TUI does not confuse similarly prefixed commands with /discover", async () => {
+  const output = new PassThrough();
+  let rendered = "";
+  output.on("data", chunk => { rendered += chunk.toString(); });
+  let called = false;
+  const tui = createTui({
+    agent: { run: async task => { called = task === "/discovery"; return { output: "agent handled it" }; } },
+    registry: registry(),
+    input: new PassThrough(),
+    output
+  });
+  for (const char of "/discovery") await tui.handleKey({ sequence: char });
+  await tui.handleKey({ name: "enter" });
+  assert.equal(called, true);
+  assert.match(rendered, /agent handled it/);
 });
