@@ -264,3 +264,38 @@ test("real model runtime gives actionable diagnostics for non-JSON provider resp
       && /upstream unavailable/.test(error.message)
   );
 });
+
+
+test("real model runtime does not amplify token rate limits without Retry-After", async () => {
+  let calls = 0;
+  const model = new OpenAICompatibleModel({
+    apiKey: "test-key",
+    baseUrl: "https://example.test/v1",
+    model: "test-model",
+    maxRetries: 2,
+    fetchImpl: async () => {
+      calls += 1;
+      return response({ error: { message: "Token rate limit exceeded" } }, { status: 429 });
+    }
+  });
+
+  await assert.rejects(model.next({ messages: [{ role: "user", content: "rate limit" }] }), error => error.status === 429 && error.retryable === false);
+  assert.equal(calls, 1);
+});
+
+test("real model runtime honors provider Retry-After for retryable rate limits", async () => {
+  let calls = 0;
+  const model = new OpenAICompatibleModel({
+    apiKey: "test-key",
+    baseUrl: "https://example.test/v1",
+    model: "test-model",
+    maxRetries: 1,
+    fetchImpl: async () => {
+      calls += 1;
+      return response({ error: { message: "slow down" } }, { status: 429, headers: { "retry-after": "0.001" } });
+    }
+  });
+
+  await assert.rejects(model.next({ messages: [{ role: "user", content: "rate limit" }] }), error => error.status === 429 && error.retryable === true);
+  assert.equal(calls, 2);
+});
