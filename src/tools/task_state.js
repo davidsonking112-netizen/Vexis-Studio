@@ -16,6 +16,8 @@ function isWithin(root, target) {
 function validatePlan(plan) {
   if (!Array.isArray(plan)) throw new TypeError("plan must be an array");
 
+  const ids = new Set();
+
   return plan.map((step, index) => {
     if (!step || typeof step !== "object") {
       throw new TypeError(`plan step ${index} must be an object`);
@@ -24,13 +26,19 @@ function validatePlan(plan) {
       throw new TypeError(`plan step ${index} requires id and title`);
     }
 
+    const id = String(step.id);
+    if (ids.has(id)) {
+      throw new TypeError(`duplicate plan step id: ${id}`);
+    }
+    ids.add(id);
+
     const status = step.status ?? "pending";
     if (!STEP_STATUSES.has(status)) {
       throw new TypeError(`invalid plan step status: ${status}`);
     }
 
     return {
-      id: String(step.id),
+      id,
       title: String(step.title),
       status,
       notes: step.notes == null ? "" : String(step.notes)
@@ -105,7 +113,28 @@ export function createTaskStateTool({
     throw new Error("Task state path escapes the workspace");
   }
 
+  async function assertSafeStatePath() {
+    const realRoot = await fs.realpath(root);
+    const parent = path.dirname(file);
+    await fs.mkdir(parent, { recursive: true });
+    const realParent = await fs.realpath(parent);
+
+    if (!isWithin(realRoot, realParent)) {
+      throw new Error("Task state path escapes the workspace");
+    }
+
+    try {
+      const realFile = await fs.realpath(file);
+      if (!isWithin(realRoot, realFile)) {
+        throw new Error("Task state path escapes the workspace");
+      }
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+
   async function readState() {
+    await assertSafeStatePath();
     try {
       const content = await fs.readFile(file, "utf8");
       if (Buffer.byteLength(content, "utf8") > maxBytes) {
@@ -119,6 +148,8 @@ export function createTaskStateTool({
   }
 
   async function writeState(state) {
+    await assertSafeStatePath();
+
     const normalized = validateState({
       ...state,
       updated_at: new Date().toISOString()
