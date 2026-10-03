@@ -1,13 +1,28 @@
 import { Agent } from "./agent.js";
+import { createFilesystemTools, toAgentTools } from "./tools/filesystem.js";
+
+const filesystem = createFilesystemTools({
+  workspace: process.cwd()
+});
+
+const tools = toAgentTools(filesystem);
 
 const model = {
-  async next({ messages, tools }) {
+  async next({ messages, tools: availableTools }) {
     const last = messages.at(-1);
 
     if (last?.role === "user") {
       return {
+        type: "tool_call",
+        name: "list_files",
+        input: { path: ".", max_entries: 100 }
+      };
+    }
+
+    if (last?.role === "tool" && last.name === "list_files") {
+      return {
         type: "final",
-        content: "Agent kernel is running. No tools are installed yet."
+        content: `I inspected the workspace. Available tools: ${availableTools.join(", ")}. The filesystem layer is operational.`
       };
     }
 
@@ -18,9 +33,17 @@ const model = {
   }
 };
 
-const agent = new Agent({ model });
+const agent = new Agent({
+  model,
+  tools,
+  onEvent: event => {
+    if (event.type === "tool_result") {
+      console.log(`[tool] ${event.name}`);
+    }
+  }
+});
 
-const task = process.argv.slice(2).join(" ") || "Start Vexis Studio";
+const task = process.argv.slice(2).join(" ") || "Inspect this workspace";
 const result = await agent.run(task);
 
 console.log(result.output);
