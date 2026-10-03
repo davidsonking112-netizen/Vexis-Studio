@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 0;
@@ -216,6 +217,8 @@ const tools = document.getElementById("tools");
 const toolSearch = document.getElementById("tool-search");
 let toolList = [];
 let activeView = "agent";
+let activeTaskId = null;
+let activeEvents = null;
 
 function setStatus(text, mode = "ready") {
   status.textContent = text;
@@ -329,14 +332,26 @@ form.addEventListener("submit", async event => {
   addMessage("user", task);
   input.value = "";
   resizeInput();
-  button.disabled = true;
+  button.disabled = false;
+  button.textContent = "Cancel task";
+  activeTaskId = crypto.randomUUID();
   setStatus("Working…", "busy");
-  activity.innerHTML = "<strong>Agent active.</strong><br>Executing the task through the shared runtime.";
+  activity.innerHTML = "<strong>Agent active.</strong><br>Starting the task…";
+  activeEvents = new EventSource("/api/events/" + encodeURIComponent(activeTaskId));
+  activeEvents.onmessage = event => {
+    try {
+      const payload = JSON.parse(event.data);
+      if (payload.type === "model_start") activity.innerHTML = "<strong>Agent active.</strong><br>Thinking at step " + (payload.step + 1) + "…";
+      else if (payload.type === "tool_result") activity.innerHTML = "<strong>Tool complete</strong><br>" + payload.name;
+      else if (payload.type === "tool_error") activity.innerHTML = "<strong>Tool error</strong><br>" + payload.name;
+    } catch {}
+  };
+  activeEvents.onerror = () => {};
   try {
     const response = await fetch("/api/task", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ task })
+      body: JSON.stringify({ id: activeTaskId, task })
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Request failed");
@@ -348,9 +363,24 @@ form.addEventListener("submit", async event => {
     activity.innerHTML = "<strong>Last task</strong><br>Failed. See the conversation for details.";
     setStatus("Needs attention", "error");
   } finally {
+    if (activeEvents) activeEvents.close();
+    activeEvents = null;
+    activeTaskId = null;
     button.disabled = false;
+    button.textContent = "Run task ↵";
     input.focus();
   }
+});
+
+button.addEventListener("click", async event => {
+  if (!activeTaskId) return;
+  event.preventDefault();
+  const id = activeTaskId;
+  button.disabled = true;
+  activity.innerHTML = "<strong>Stopping…</strong><br>Requesting task cancellation.";
+  try {
+    await fetch("/api/task/" + encodeURIComponent(id), { method: "DELETE" });
+  } catch {}
 });
 
 input.addEventListener("keydown", event => {
@@ -444,9 +474,28 @@ export function createDesktop({
 
   let server;
   let taskQueue = Promise.resolve();
+  const tasks = new Map();
 
-  const enqueueTask = task => {
-    const run = taskQueue.catch(() => undefined).then(() => agent.run(task));
+  const publish = (taskId, event) => {
+    const state = tasks.get(taskId);
+    if (!state) return;
+    state.events.push(event);
+    if (state.events.length > 100) state.events.shift();
+    for (const client of state.clients) {
+      client.write("data: " + JSON.stringify(event) + "\n\n");
+    }
+  };
+
+  const enqueueTask = (taskId, task) => {
+    const state = tasks.get(taskId);
+    const run = taskQueue.catch(() => undefined).then(() => {
+      state.started = true;
+      publish(taskId, { type: "task_start" });
+      return agent.run(task, {
+        signal: state.controller.signal,
+        onEvent: event => publish(taskId, event)
+      });
+    });
     taskQueue = run.catch(() => undefined);
     return run;
   };
@@ -477,18 +526,30 @@ export function createDesktop({
     if (request.method === "POST" && url.pathname === "/api/task") {
       try {
         const body = await readJson(request);
+        const taskId = typeof body.id === "string" && body.id ? body.id : randomUUID();
         if (typeof body.task !== "string" || !body.task.trim()) {
           sendJson(response, 400, { error: "task must be a non-empty string" });
           return;
         }
-        const result = await enqueueTask(body.task.trim());
-        sendJson(response, 200, {
+        if (tasks.has(taskId)) {
+          sendJson(response, 409, { error: "Task id is already in use" });
+          return;
+        }
+        const state = { controller: new AbortController(), clients: new Set(), events: [], started: false, done: false };
+        tasks.set(taskId, state);
+        try {
+          const result = await enqueueTask(taskId, body.task.trim());
+          state.done = true;
+          publish(taskId, { type: "task_complete", status: result?.status || "completed" });
+          sendJson(response, 200, { id: taskId,
           status: result?.status || "completed",
           output: result?.output || ""
-        });
-      } catch (error) {
-        sendJson(response, error.statusCode || 500, { error: error instanceof Error ? error.message : String(error) });
-      }
+          });
+        } catch (error) {
+          state.done = true;
+          publish(taskId, { type: "task_error", error: error instanceof Error ? error.message : String(error) });
+          sendJson(response, error.statusCode || 500, { id: taskId, error: error instanceof Error ? error.message : String(error) });
+        }
       return;
     }
 
