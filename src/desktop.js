@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
+import { analyzeDocument } from "./tools/editor_intelligence.js";
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_PORT = 0;
@@ -274,7 +275,7 @@ kbd { border:1px solid var(--line-strong); background:var(--panel-3); color:var(
       <section id="messages" class="messages" hidden></section>
     <section id="editor-view" class="editor-shell" hidden>
       <div class="editor-files"><div class="editor-files-head"><strong>Files</strong><span id="file-count"></span></div><div id="file-list"></div></div>
-      <div class="editor-pane"><div class="editor-tabs" id="editor-tabs"></div><div class="editor-tab-meta"><span id="editor-path">Select a file</span><span id="editor-hash"></span><button id="editor-find" class="editor-preview" type="button" disabled>Find & Replace</button></div><div id="editor-findbar" class="editor-findbar" hidden><div class="editor-findrow"><input id="editor-find-input" class="editor-findinput" placeholder="Find" aria-label="Find"><input id="editor-replace-input" class="editor-findinput" placeholder="Replace" aria-label="Replace"></div><div class="editor-findactions"><span id="editor-find-status">Ready</span><div><button id="editor-find-prev" class="editor-findbutton" type="button">Previous</button><button id="editor-find-next" class="editor-findbutton" type="button">Next</button><button id="editor-replace-one" class="editor-findbutton" type="button">Replace</button><button id="editor-replace-all" class="editor-findbutton primary" type="button">Replace all</button><button id="editor-find-close" class="editor-findbutton" type="button">Done</button></div></div></div><textarea id="editor-code" class="editor-code" spellcheck="false" disabled placeholder="Select a workspace file to begin editing…"></textarea><div class="editor-status"><span id="editor-message">Safe editor · hash guarded saves</span><div style="display:flex;gap:7px"><button id="editor-preview" class="editor-preview" type="button" disabled>Preview</button><button id="editor-save-all" class="editor-save" type="button" disabled>Save all</button><button id="editor-save" class="editor-save" type="button" disabled>Save changes</button></div></div></div>
+      <div class="editor-pane"><div class="editor-tabs" id="editor-tabs"></div><div class="editor-tab-meta"><span id="editor-path">Select a file</span><span id="editor-hash"></span><span id="editor-location">Ln 1, Col 1</span><span id="editor-intelligence">Intelligence idle</span><button id="editor-find" class="editor-preview" type="button" disabled>Find & Replace</button></div><div id="editor-findbar" class="editor-findbar" hidden><div class="editor-findrow"><input id="editor-find-input" class="editor-findinput" placeholder="Find" aria-label="Find"><input id="editor-replace-input" class="editor-findinput" placeholder="Replace" aria-label="Replace"></div><div class="editor-findactions"><span id="editor-find-status">Ready</span><div><button id="editor-find-prev" class="editor-findbutton" type="button">Previous</button><button id="editor-find-next" class="editor-findbutton" type="button">Next</button><button id="editor-replace-one" class="editor-findbutton" type="button">Replace</button><button id="editor-replace-all" class="editor-findbutton primary" type="button">Replace all</button><button id="editor-find-close" class="editor-findbutton" type="button">Done</button></div></div></div><textarea id="editor-code" class="editor-code" spellcheck="false" disabled placeholder="Select a workspace file to begin editing…"></textarea><div class="editor-status"><span id="editor-message">Safe editor · hash guarded saves</span><span id="editor-diagnostics"></span><div style="display:flex;gap:7px"><button id="editor-preview" class="editor-preview" type="button" disabled>Preview</button><button id="editor-save-all" class="editor-save" type="button" disabled>Save all</button><button id="editor-save" class="editor-save" type="button" disabled>Save changes</button></div></div></div>
     </section>
     <div id="diff-backdrop" class="diff-backdrop" hidden>
       <section class="diff-dialog" role="dialog" aria-modal="true" aria-labelledby="diff-title">
@@ -424,6 +425,37 @@ async function discoverTools(query = "") {
 }
 
 function editorIsDirty(file) { return !!file && file.content !== file.original; }
+let editorIntelligenceRequest = 0;
+function updateEditorLocation() {
+  const code=document.getElementById("editor-code"), before=code.value.slice(0,code.selectionStart);
+  const lines=before.split("\n");
+  document.getElementById("editor-location").textContent="Ln "+lines.length+", Col "+(lines.at(-1).length+1);
+}
+function renderEditorIntelligence(result) {
+  const diagnostics=document.getElementById("editor-diagnostics");
+  const errors=result.diagnostics.filter(d=>d.severity==="error").length;
+  diagnostics.textContent=result.diagnostics.length?(errors+" errors · "+result.diagnostics.length+" diagnostics"):"No diagnostics";
+  document.getElementById("editor-intelligence").textContent=result.symbols.length+" symbols · "+result.language;
+  const activityText=result.diagnostics.length ? result.diagnostics.slice(0,3).map(d=>d.severity.toUpperCase()+" · line "+d.line+" · "+d.message).join("<br>") : "<strong>Editor intelligence</strong><br>No structural issues detected.";
+  activity.innerHTML=activityText;
+}
+async function analyzeEditorCurrent() {
+  if(!editorCurrent) return;
+  const requestId=++editorIntelligenceRequest;
+  document.getElementById("editor-intelligence").textContent="Analyzing…";
+  try {
+    const response=await fetch("/api/editor/intelligence",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({path:editorCurrent.path,content:editorCurrent.content})});
+    const data=await response.json();
+    if(requestId!==editorIntelligenceRequest) return;
+    if(!response.ok) throw new Error(data.error||"Editor analysis failed");
+    editorCurrent.intelligence=data; renderEditorIntelligence(data);
+  } catch(error) {
+    if(requestId!==editorIntelligenceRequest) return;
+    document.getElementById("editor-intelligence").textContent="Intelligence unavailable";
+    document.getElementById("editor-diagnostics").textContent=error.message;
+  }
+}
+
 function updateEditorChrome() {
   const tabs = document.getElementById("editor-tabs"); tabs.replaceChildren();
   for (const file of editorOpenFiles) {
@@ -449,7 +481,7 @@ async function loadEditorFiles() {
 function selectEditorFile(file) {
   editorCurrent=file; document.getElementById("editor-path").textContent=file.path; document.getElementById("editor-hash").textContent=file.sha256.slice(0,10);
   const code=document.getElementById("editor-code"); code.disabled=false; code.value=file.content;
-  document.getElementById("editor-message").textContent=editorIsDirty(file)?"Unsaved changes":"Loaded · changes are protected by SHA-256"; updateEditorChrome(); code.focus();
+  document.getElementById("editor-message").textContent=editorIsDirty(file)?"Unsaved changes":"Loaded · changes are protected by SHA-256"; updateEditorChrome(); updateEditorLocation(); code.focus(); void analyzeEditorCurrent();
 }
 async function openEditorFile(path) {
   const existing=editorOpenFiles.find(file=>file.path===path);
@@ -641,11 +673,16 @@ document.getElementById("editor-nav").addEventListener("click", async () => {
   selectView("editor");
   try { await loadEditorFiles(); } catch (error) { document.getElementById("editor-message").textContent = error.message; }
 });
+document.getElementById("editor-code").addEventListener("select", updateEditorLocation);
+document.getElementById("editor-code").addEventListener("click", updateEditorLocation);
+document.getElementById("editor-code").addEventListener("keyup", updateEditorLocation);
 document.getElementById("editor-code").addEventListener("input", event => {
   if (!editorCurrent) return;
   editorCurrent.content = event.target.value;
   document.getElementById("editor-message").textContent = editorIsDirty(editorCurrent) ? "Unsaved changes" : "No unsaved changes";
   updateEditorChrome();
+  updateEditorLocation();
+  void analyzeEditorCurrent();
 });
 function editorFindMatches(query) {
   if(!editorCurrent||!query) return [];
@@ -741,12 +778,12 @@ function sendHtml(response, html) {
   response.end(html);
 }
 
-async function readJson(request) {
+async function readJson(request, maxBytes = MAX_BODY_BYTES) {
   let size = 0;
   const chunks = [];
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > MAX_BODY_BYTES) throw Object.assign(new Error("Request body is too large."), { statusCode: 413 });
+    if (size > maxBytes) throw Object.assign(new Error("Request body is too large."), { statusCode: 413 });
     chunks.push(chunk);
   }
   if (!chunks.length) return {};
@@ -848,6 +885,17 @@ export function createDesktop({
         content: result.content,
         sha256: createHash("sha256").update(result.content, "utf8").digest("hex")
       });
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/editor/intelligence") {
+      const body = await readJson(request, 256 * 1024);
+      if (typeof body.path !== "string" || !body.path || typeof body.content !== "string") {
+        sendJson(response, 400, { error: "path and content are required" });
+        return;
+      }
+      try { sendJson(response, 200, analyzeDocument(body.content, body.path)); }
+      catch (error) { sendJson(response, 422, { error: error instanceof Error ? error.message : String(error) }); }
       return;
     }
 
