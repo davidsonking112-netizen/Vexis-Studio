@@ -8,7 +8,8 @@ const MAX_STEPS = 100;
 const MAX_DEPENDENCIES = 20;
 const MAX_TEXT = 4_000;
 const DEFAULT_PLANNER_CONTEXT_TOKENS = 6_000;
-const DEFAULT_PLANNER_OUTPUT_TOKENS = 4_096;
+const DEFAULT_PLANNER_OUTPUT_TOKENS = 6_000;
+const DEFAULT_PLANNER_REPAIR_OUTPUT_TOKENS = 3_000;
 
 function text(value, name, { required = false, max = MAX_TEXT } = {}) {
   const valueText = String(value ?? "").trim();
@@ -232,6 +233,7 @@ export function buildPlanPrompt({ task, context = "", previousPlan = null }) {
     "Every step must have a concrete objective, dependencies, target files when known, actions, and at least one verification or acceptance criterion.",
     "Dependencies must form a directed acyclic graph.",
     "Include risks and mitigations, completion criteria, and a concise summary.",
+    "Keep the plan compact. Prefer 1-10 steps unless the task genuinely requires more.",
     "Return ONLY valid JSON matching this shape:",
     JSON.stringify({
       plan_id: "stable-or-new-id",
@@ -311,7 +313,48 @@ export class PlanningEngine {
       throw new Error("Planner model must return a final JSON plan");
     }
 
-    const plan = validatePlan(extractJson(response.content));
+    let plan;
+    try {
+      plan = validatePlan(extractJson(response.content));
+    } catch (error) {
+      // Providers occasionally return prose or truncate a large JSON plan. A
+      // bounded repair pass is safer than crashing the entire agent run and
+      // asks the same model to regenerate a compact, schema-compliant plan.
+      const repairMessages = [
+        { role: "system", content: buildPlanPrompt({ task, previousPlan }) },
+        {
+          role: "user",
+          content: [
+            "USER TASK:",
+            task,
+            "",
+            "REPOSITORY CONTEXT:",
+            context.content,
+            "",
+            "The previous planner response could not be parsed or validated.",
+            "Regenerate the plan from scratch.",
+            "Return ONLY compact valid JSON. Do not use markdown fences, prose, comments, or trailing text.",
+            "Keep the plan minimal: use only the steps required to complete the task, and keep each text field concise."
+          ].join("\\n")
+        }
+      ];
+      const repairBudget = budget
+        ? budget.prepare(repairMessages, DEFAULT_PLANNER_REPAIR_OUTPUT_TOKENS)
+        : { outputTokens: DEFAULT_PLANNER_REPAIR_OUTPUT_TOKENS };
+      const repaired = await this.model.next({
+        messages: repairMessages,
+        toolDefinitions: [],
+        maxTokens: repairBudget.outputTokens,
+        signal
+      });
+      if (budget) budget.record(repaired.usage);
+      if (repaired?.type !== "final") throw error;
+      try {
+        plan = validatePlan(extractJson(repaired.content));
+      } catch {
+        throw error;
+      }
+    }
     if (plan.steps.length > this.maxSteps) {
       throw new Error("Planner produced too many steps");
     }
