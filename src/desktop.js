@@ -701,6 +701,10 @@ export function createDesktop({
       const requestedPath = url.searchParams.get("path");
       if (!requestedPath) { sendJson(response, 400, { error: "path is required" }); return; }
       const result = await filesystem.read_file.execute({ path: requestedPath });
+      if (result.content.includes("\u0000")) {
+        sendJson(response, 415, { error: "Binary files are not supported by the text editor." });
+        return;
+      }
       const { createHash } = await import("node:crypto");
       sendJson(response, 200, {
         path: result.path,
