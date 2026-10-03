@@ -58,7 +58,7 @@ function parseImports(content, file) {
   for (const m of content.matchAll(/\bfrom\s+["']([^"']+)["']/g)) add(m[1], m[1], "from");
   for (const m of content.matchAll(/^\s*#include\s*[<"]([^>"]+)[>"]/gm)) add(m[1], m[1], "include");
   for (const m of content.matchAll(/\b(?:use|mod)\s+([A-Za-z_][\w:]*)/g)) add(m[1], m[1], "module");
-  return imports;
+  return [...new Map(imports.map(item => [item.type+":"+item.source, item])).values()];
 }
 
 function resolveImport(source, fromFile, files) {
