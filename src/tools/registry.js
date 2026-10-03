@@ -146,6 +146,12 @@ export class SkillRegistry {
     if (!definition) throw new Error(`Unknown skill: ${name}`);
 
     for (const toolName of definition.toolNames) {
+      if (this.toolRegistry.has(toolName)) {
+        throw new Error(`Skill ${name} conflicts with existing tool: ${toolName}`);
+      }
+    }
+
+    for (const toolName of definition.toolNames) {
       this.toolRegistry.register(toolName, definition.tools[toolName]);
     }
 
