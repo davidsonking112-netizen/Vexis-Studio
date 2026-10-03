@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";\nimport { estimateBudgetTokens } from "../runtime/token-budget.js";
 
 const PLAN_VERSION = 1;
 const STEP_STATUSES = new Set(["pending", "in_progress", "completed", "blocked", "skipped"]);
@@ -243,7 +243,7 @@ export class PlanningEngine {
     this.outputTokens = outputTokens;
   }
 
-  async create(task, { signal, previousPlan = null, messages = [] } = {}) {
+  async create(task, { signal, previousPlan = null, messages = [], budget = null } = {}) {
     if (signal?.aborted) throw new Error("Planning cancelled");
     const context = this.contextEngine
       ? await this.contextEngine.build({ task, messages, maxTokens: Math.min(this.contextTokens, this.contextEngine.maxTokens) })
