@@ -1,4 +1,6 @@
-import { TokenBudget, DEFAULT_TOKEN_BUDGET } from "./runtime/token-budget.js";\n\nexport class Agent {
+import { TokenBudget, DEFAULT_TOKEN_BUDGET } from "./runtime/token-budget.js";
+
+export class Agent {
   constructor({ model, tools = {}, toolDefinitions = null, contextEngine = null, planningEngine = null, memory = null, repositoryIntelligence = null, maxSteps = 20, tokenBudget = DEFAULT_TOKEN_BUDGET, onEvent = () => {} }) {
     if (!model || typeof model.next !== "function") {
       throw new TypeError("model.next must be a function");
@@ -23,6 +25,7 @@ import { TokenBudget, DEFAULT_TOKEN_BUDGET } from "./runtime/token-budget.js";\n
     if (repositoryIntelligence && typeof repositoryIntelligence.inspect !== "function") throw new TypeError("repositoryIntelligence must provide inspect()");
     this.repositoryIntelligence = repositoryIntelligence;
     this.maxSteps = maxSteps;
+    this.tokenBudgetConfig = tokenBudget;
     this.onEvent = onEvent;
   }
 
@@ -30,7 +33,7 @@ import { TokenBudget, DEFAULT_TOKEN_BUDGET } from "./runtime/token-budget.js";\n
     let modelMessages = messages;
     const memoryMessages = [];
     if (this.repositoryIntelligence) {
-      const intelligence = await this.repositoryIntelligence.inspect({ query: task, limit: 40 });
+      const intelligence = await this.repositoryIntelligence.inspect({ query: task, limit: 16 });
       if (intelligence.symbols.length || intelligence.dependencies.length) {
         memoryMessages.push({
           role: "system",
@@ -185,8 +188,10 @@ import { TokenBudget, DEFAULT_TOKEN_BUDGET } from "./runtime/token-budget.js";\n
   async run(task, { signal, onEvent = this.onEvent } = {}) {
     if (signal?.aborted) throw new Error("Task cancelled");
     let plan = null;
+    const budget = new TokenBudget(this.tokenBudgetConfig);
+    onEvent({ type: "token_budget_start", budget: budget.snapshot() });
     if (this.planningEngine) {
-      plan = await this.planningEngine.create(task, { signal });
+      plan = await this.planningEngine.create(task, { signal, budget });
       onEvent({
         type: "plan_created",
         plan: {
@@ -246,7 +251,8 @@ import { TokenBudget, DEFAULT_TOKEN_BUDGET } from "./runtime/token-budget.js";\n
           steps: step + 1,
           usage: response.usage ?? null,
           provider: response.provider ?? null,
-          model: response.model ?? null
+          model: response.model ?? null,
+          token_budget: budget.snapshot()
         };
       }
 
@@ -259,7 +265,8 @@ import { TokenBudget, DEFAULT_TOKEN_BUDGET } from "./runtime/token-budget.js";\n
     return {
       status: "max_steps",
       output: "",
-      steps: this.maxSteps
+      steps: this.maxSteps,
+      token_budget: budget.snapshot()
     };
   }
 }
