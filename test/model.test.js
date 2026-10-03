@@ -46,6 +46,16 @@ test("real model runtime normalizes a final provider response", async () => {
   assert.equal(request.options.headers.accept, "application/json");
 });
 
+test("real model runtime supports a per-request output token budget", async () => {
+  let request;
+  const model = new OpenAICompatibleModel({
+    apiKey: "test-key", baseUrl: "https://example.test/v1", model: "test-model",
+    fetchImpl: async (_url, options) => { request = JSON.parse(options.body); return response({ choices: [{ message: { role: "assistant", content: "ok" } }] }); }
+  });
+  await model.next({ messages: [{ role: "user", content: "plan" }], maxTokens: 4096 });
+  assert.equal(request.max_tokens, 4096);
+});
+
 test("real model runtime converts tool definitions and normalizes tool calls", async () => {
   let request;
   const model = new OpenAICompatibleModel({
