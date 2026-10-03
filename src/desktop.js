@@ -175,6 +175,17 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .editor-save:hover { background:rgba(139,124,255,.2); }
 .editor-preview { border:1px solid var(--line); background:rgba(255,255,255,.025); color:#aeb6c8; border-radius:8px; padding:6px 10px; font-size:9px; cursor:pointer; }
 .editor-preview:hover { background:rgba(255,255,255,.06); color:var(--text); }
+.editor-findbar { position:absolute; top:52px; right:14px; z-index:7; width:min(420px,calc(100% - 28px)); padding:9px; display:grid; gap:7px; border:1px solid var(--line-strong); border-radius:12px; background:rgba(15,18,27,.96); box-shadow:0 16px 42px rgba(0,0,0,.34); backdrop-filter:blur(18px); }
+.editor-findbar[hidden] { display:none; }
+.editor-findrow { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:7px; }
+.editor-findinput { width:100%; border:1px solid var(--line); background:rgba(4,6,10,.42); color:var(--text); border-radius:8px; padding:7px 9px; outline:0; font-size:10px; }
+.editor-findinput:focus { border-color:var(--line-bright); box-shadow:0 0 0 3px rgba(139,124,255,.07); }
+.editor-findactions { display:flex; align-items:center; justify-content:space-between; gap:7px; }
+.editor-findactions span { color:#747e92; font-size:9px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.editor-findactions div { display:flex; gap:5px; }
+.editor-findbutton { border:1px solid var(--line); background:rgba(255,255,255,.025); color:#aeb6c8; border-radius:7px; padding:5px 8px; font-size:9px; cursor:pointer; }
+.editor-findbutton:hover { background:rgba(255,255,255,.07); color:var(--text); }
+.editor-findbutton.primary { border-color:rgba(174,160,255,.35); background:rgba(139,124,255,.12); color:#d8d2ff; }
 .diff-backdrop { position:absolute; inset:0; z-index:8; display:grid; place-items:center; padding:28px; background:rgba(2,3,7,.72); backdrop-filter:blur(10px); }
 .diff-backdrop[hidden] { display:none; }
 .diff-dialog { width:min(980px,100%); max-height:min(82vh,760px); display:grid; grid-template-rows:auto minmax(0,1fr) auto; overflow:hidden; border:1px solid var(--line-strong); border-radius:16px; background:#0c0f17; box-shadow:var(--shadow); }
@@ -263,7 +274,7 @@ kbd { border:1px solid var(--line-strong); background:var(--panel-3); color:var(
       <section id="messages" class="messages" hidden></section>
     <section id="editor-view" class="editor-shell" hidden>
       <div class="editor-files"><div class="editor-files-head"><strong>Files</strong><span id="file-count"></span></div><div id="file-list"></div></div>
-      <div class="editor-pane"><div class="editor-tabs" id="editor-tabs"></div><div class="editor-tab-meta"><span id="editor-path">Select a file</span><span id="editor-hash"></span></div><textarea id="editor-code" class="editor-code" spellcheck="false" disabled placeholder="Select a workspace file to begin editing…"></textarea><div class="editor-status"><span id="editor-message">Safe editor · hash guarded saves</span><div style="display:flex;gap:7px"><button id="editor-preview" class="editor-preview" type="button" disabled>Preview</button><button id="editor-save-all" class="editor-save" type="button" disabled>Save all</button><button id="editor-save" class="editor-save" type="button" disabled>Save changes</button></div></div></div>
+      <div class="editor-pane"><div class="editor-tabs" id="editor-tabs"></div><div class="editor-tab-meta"><span id="editor-path">Select a file</span><span id="editor-hash"></span><button id="editor-find" class="editor-preview" type="button" disabled>Find & Replace</button></div><div id="editor-findbar" class="editor-findbar" hidden><div class="editor-findrow"><input id="editor-find-input" class="editor-findinput" placeholder="Find" aria-label="Find"><input id="editor-replace-input" class="editor-findinput" placeholder="Replace" aria-label="Replace"></div><div class="editor-findactions"><span id="editor-find-status">Ready</span><div><button id="editor-find-prev" class="editor-findbutton" type="button">Previous</button><button id="editor-find-next" class="editor-findbutton" type="button">Next</button><button id="editor-replace-one" class="editor-findbutton" type="button">Replace</button><button id="editor-replace-all" class="editor-findbutton primary" type="button">Replace all</button><button id="editor-find-close" class="editor-findbutton" type="button">Done</button></div></div></div><textarea id="editor-code" class="editor-code" spellcheck="false" disabled placeholder="Select a workspace file to begin editing…"></textarea><div class="editor-status"><span id="editor-message">Safe editor · hash guarded saves</span><div style="display:flex;gap:7px"><button id="editor-preview" class="editor-preview" type="button" disabled>Preview</button><button id="editor-save-all" class="editor-save" type="button" disabled>Save all</button><button id="editor-save" class="editor-save" type="button" disabled>Save changes</button></div></div></div>
     </section>
     <div id="diff-backdrop" class="diff-backdrop" hidden>
       <section class="diff-dialog" role="dialog" aria-modal="true" aria-labelledby="diff-title">
@@ -425,6 +436,7 @@ function updateEditorChrome() {
   document.querySelectorAll(".file-item").forEach(item=>{const open=editorOpenFiles.some(f=>f.path===item.dataset.path);item.classList.toggle("active",open&&editorCurrent?.path===item.dataset.path);item.classList.toggle("open",open);});
   document.getElementById("editor-save").disabled=!editorCurrent||!editorIsDirty(editorCurrent);
   document.getElementById("editor-preview").disabled=!editorCurrent||!editorIsDirty(editorCurrent);
+  document.getElementById("editor-find").disabled=!editorCurrent;
   document.getElementById("editor-save-all").disabled=!editorOpenFiles.some(editorIsDirty);
 }
 async function loadEditorFiles() {
@@ -635,7 +647,59 @@ document.getElementById("editor-code").addEventListener("input", event => {
   document.getElementById("editor-message").textContent = editorIsDirty(editorCurrent) ? "Unsaved changes" : "No unsaved changes";
   updateEditorChrome();
 });
+function editorFindMatches(query) {
+  if(!editorCurrent||!query) return [];
+  const matches=[]; let from=0;
+  while(from<editorCurrent.content.length){const at=editorCurrent.content.indexOf(query,from);if(at<0)break;matches.push(at);from=at+Math.max(query.length,1);}
+  return matches;
+}
+function updateEditorFindStatus(message) { document.getElementById("editor-find-status").textContent=message; }
+function selectEditorMatch(direction=1) {
+  const code=document.getElementById("editor-code"), query=document.getElementById("editor-find-input").value;
+  if(!query||!editorCurrent){updateEditorFindStatus("Enter text to find.");return;}
+  const matches=editorFindMatches(query), current=code.selectionStart;
+  if(!matches.length){updateEditorFindStatus("No matches");return;}
+  let index=direction>0?matches.findIndex(at=>at>current):matches.map(at=>at).reverse().findIndex(at=>at<current);
+  if(index<0) index=direction>0?0:matches.length-1;
+  else if(direction<0) index=matches.length-1-index;
+  const at=matches[index]; code.focus(); code.setSelectionRange(at,at+query.length);
+  updateEditorFindStatus((index+1)+" of "+matches.length+" matches");
+}
+function replaceEditorMatch() {
+  const code=document.getElementById("editor-code"), query=document.getElementById("editor-find-input").value, replacement=document.getElementById("editor-replace-input").value;
+  if(!editorCurrent||!query){updateEditorFindStatus("Enter text to find.");return;}
+  if(code.value.slice(code.selectionStart,code.selectionEnd)!==query){selectEditorMatch(1);return;}
+  const start=code.selectionStart; editorCurrent.content=editorCurrent.content.slice(0,start)+replacement+editorCurrent.content.slice(start+query.length);
+  code.value=editorCurrent.content; code.setSelectionRange(start,start+replacement.length); code.focus();
+  updateEditorFindStatus(editorFindMatches(query).length+" matches remaining");
+  updateEditorChrome();
+}
+function replaceAllEditorMatches() {
+  const query=document.getElementById("editor-find-input").value, replacement=document.getElementById("editor-replace-input").value;
+  if(!editorCurrent||!query){updateEditorFindStatus("Enter text to find.");return;}
+  const matches=editorFindMatches(query); if(!matches.length){updateEditorFindStatus("No matches");return;}
+  editorCurrent.content=editorCurrent.content.split(query).join(replacement);
+  document.getElementById("editor-code").value=editorCurrent.content;
+  updateEditorFindStatus("Replaced "+matches.length+" matches");
+  updateEditorChrome();
+}
+function openEditorFind() {
+  if(!editorCurrent){return;}
+  const bar=document.getElementById("editor-findbar");bar.hidden=false;
+  const input=document.getElementById("editor-find-input");input.focus();input.select();
+  updateEditorFindStatus("Ready");
+}
+function closeEditorFind(){document.getElementById("editor-findbar").hidden=true;}
+
 document.getElementById("editor-preview").addEventListener("click", showEditorDiff);
+document.getElementById("editor-find").addEventListener("click", openEditorFind);
+document.getElementById("editor-find-close").addEventListener("click", closeEditorFind);
+document.getElementById("editor-find-prev").addEventListener("click",()=>selectEditorMatch(-1));
+document.getElementById("editor-find-next").addEventListener("click",()=>selectEditorMatch(1));
+document.getElementById("editor-replace-one").addEventListener("click",replaceEditorMatch);
+document.getElementById("editor-replace-all").addEventListener("click",replaceAllEditorMatches);
+document.getElementById("editor-find-input").addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();selectEditorMatch(event.shiftKey?-1:1);}if(event.key==="Escape")closeEditorFind();});
+document.getElementById("editor-replace-input").addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();replaceEditorMatch();}if(event.key==="Escape")closeEditorFind();});
 document.getElementById("editor-save").addEventListener("click", saveEditorFile);
 document.getElementById("editor-save-all").addEventListener("click", saveAllEditorFiles);
 document.getElementById("diff-close").addEventListener("click", closeEditorDiff);
