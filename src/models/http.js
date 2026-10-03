@@ -21,7 +21,7 @@ function providerError(response, body) {
   const detail = body?.error?.message || body?.message || response.statusText || "Unknown provider error";
   const error = new Error(`Model provider request failed (${response.status}): ${detail}`);
   error.status = response.status;
-  error.provider = "openai-compatible";
+  error.provider = this.provider || "openai-compatible";
   error.retryable = response.status === 408 || response.status === 409 || response.status === 429 || response.status >= 500;
   return error;
 }
@@ -119,7 +119,9 @@ export class OpenAICompatibleModel {
     model = process.env.VEXIS_MODEL || process.env.OPENAI_MODEL || DEFAULT_MODEL,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     maxRetries = DEFAULT_MAX_RETRIES,
-    fetchImpl = globalThis.fetch
+    fetchImpl = globalThis.fetch,
+    provider = "openai-compatible",
+    capabilities = null
   } = {}) {
     if (typeof fetchImpl !== "function") throw new TypeError("fetch implementation is required");
     if (!model || typeof model !== "string") throw new TypeError("model must be a non-empty string");
@@ -132,13 +134,16 @@ export class OpenAICompatibleModel {
     this.timeoutMs = timeoutMs;
     this.maxRetries = maxRetries;
     this.fetch = fetchImpl;
+    this.provider = provider;
+    this.capabilities = capabilities || { toolCalling: true, structuredOutput: false, vision: false, streaming: false, parallelToolCalls: true };
   }
 
   describe() {
     return {
-      provider: "openai-compatible",
+      provider: this.provider,
       model: this.model,
-      baseUrl: this.baseUrl
+      baseUrl: this.baseUrl,
+      capabilities: { ...this.capabilities }
     };
   }
 
@@ -182,7 +187,7 @@ export class OpenAICompatibleModel {
           const normalized = normalizeModelResponse(extractChoice(payload.choices?.[0]));
           return {
             ...normalized,
-            provider: "openai-compatible",
+            provider: this.provider,
             model: this.model,
             usage: payload.usage ?? null,
             requestId: response.headers.get("x-request-id") || response.headers.get("request-id") || null
