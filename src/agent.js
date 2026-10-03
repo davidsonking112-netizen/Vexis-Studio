@@ -1,5 +1,5 @@
 export class Agent {
-  constructor({ model, tools = {}, toolDefinitions = null, contextEngine = null, maxSteps = 20, onEvent = () => {} }) {
+  constructor({ model, tools = {}, toolDefinitions = null, contextEngine = null, planningEngine = null, maxSteps = 20, onEvent = () => {} }) {
     if (!model || typeof model.next !== "function") {
       throw new TypeError("model.next must be a function");
     }
@@ -14,6 +14,10 @@ export class Agent {
       throw new TypeError("contextEngine must provide build()");
     }
     this.contextEngine = contextEngine;
+    if (planningEngine && typeof planningEngine.create !== "function") {
+      throw new TypeError("planningEngine must provide create()");
+    }
+    this.planningEngine = planningEngine;
     this.maxSteps = maxSteps;
     this.onEvent = onEvent;
   }
@@ -145,7 +149,49 @@ export class Agent {
 
   async run(task, { signal, onEvent = this.onEvent } = {}) {
     if (signal?.aborted) throw new Error("Task cancelled");
-    const messages = [{ role: "user", content: task }];
+    let plan = null;
+    if (this.planningEngine) {
+      plan = await this.planningEngine.create(task, { signal });
+      onEvent({
+        type: "plan_created",
+        plan: {
+          plan_id: plan.plan_id,
+          summary: plan.summary,
+          goals: plan.goals,
+          risks: plan.risks,
+          completion: plan.completion,
+          steps: plan.steps.map(step => ({
+            id: step.id,
+            title: step.title,
+            objective: step.objective,
+            dependencies: step.dependencies,
+            files: step.files,
+            verification: step.verification,
+            acceptance: step.acceptance,
+            priority: step.priority
+          }))
+        }
+      });
+    }
+
+    const planMessage = plan ? {
+      role: "system",
+      content: [
+        "VEXIS EXECUTION PLAN",
+        JSON.stringify({
+          plan_id: plan.plan_id,
+          summary: plan.summary,
+          goals: plan.goals,
+          completion: plan.completion,
+          steps: plan.steps
+        }, null, 2),
+        "Execute the plan in dependency order. Do not skip verification criteria. If repository reality invalidates the plan, adapt carefully and report the deviation."
+      ].join("\n\n")
+    } : null;
+    const messages = [
+      ...(planMessage ? [planMessage] : []),
+      { role: "user", content: task }
+    ];
 
     for (let step = 0; step < this.maxSteps; step++) {
       if (signal?.aborted) throw new Error("Task cancelled");
