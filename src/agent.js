@@ -1,5 +1,5 @@
-export class Agent {
-  constructor({ model, tools = {}, toolDefinitions = null, contextEngine = null, planningEngine = null, memory = null, repositoryIntelligence = null, maxSteps = 20, onEvent = () => {} }) {
+import { TokenBudget, DEFAULT_TOKEN_BUDGET } from "./runtime/token-budget.js";\n\nexport class Agent {
+  constructor({ model, tools = {}, toolDefinitions = null, contextEngine = null, planningEngine = null, memory = null, repositoryIntelligence = null, maxSteps = 20, tokenBudget = DEFAULT_TOKEN_BUDGET, onEvent = () => {} }) {
     if (!model || typeof model.next !== "function") {
       throw new TypeError("model.next must be a function");
     }
@@ -26,7 +26,7 @@ export class Agent {
     this.onEvent = onEvent;
   }
 
-  async getModelResponse(messages, { task, signal, step, onEvent }) {
+  async getModelResponse(messages, { task, signal, step, onEvent, budget }) {
     let modelMessages = messages;
     const memoryMessages = [];
     if (this.repositoryIntelligence) {
@@ -40,7 +40,7 @@ export class Agent {
       onEvent({ type: "repository_intelligence", step, symbols: intelligence.symbols.length, dependencies: intelligence.dependencies.length, truncated: intelligence.truncated });
     }
     if (this.memory) {
-      const recalled = await this.memory.recall({ query: task, limit: 10, max_tokens: 2200 });
+      const recalled = await this.memory.recall({ query: task, limit: 6, max_tokens: 1200 });
       if (recalled.entries.length) {
         memoryMessages.push({
           role: "system",
@@ -231,7 +231,7 @@ export class Agent {
     for (let step = 0; step < this.maxSteps; step++) {
       if (signal?.aborted) throw new Error("Task cancelled");
 
-      const response = await this.getModelResponse(messages, { task, signal, step, onEvent });
+      const response = await this.getModelResponse(messages, { task, signal, step, onEvent, budget });
       onEvent({ type: "model_response", step, response });
 
       if (!response || typeof response !== "object") {
