@@ -101,3 +101,25 @@ test("unregisters tools and skills", () => {
   assert.equal(skills.unregister("skill"), true);
   assert.equal(skills.get("skill"), undefined);
 });
+
+test("prevents partial skill installation when a tool collides", () => {
+  const tools = new ToolRegistry();
+  const skills = new SkillRegistry(tools);
+
+  skills.register("testing", {
+    description: "Testing skill",
+    tools: {
+      first_check: tool("First check", 1),
+      second_check: tool("Second check", 2)
+    }
+  });
+
+  tools.register("second_check", tool("External check", 3));
+
+  assert.throws(
+    () => skills.install("testing"),
+    /conflicts with existing tool: second_check/
+  );
+  assert.equal(tools.has("first_check"), false);
+  assert.equal((tools.get("second_check")).description, "External check");
+});
