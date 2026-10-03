@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";\nimport { estimateBudgetTokens } from "../runtime/token-budget.js";
+import { randomUUID } from "node:crypto";
+import { estimateBudgetTokens } from "../runtime/token-budget.js";
 
 const PLAN_VERSION = 1;
 const STEP_STATUSES = new Set(["pending", "in_progress", "completed", "blocked", "skipped"]);
@@ -222,8 +223,7 @@ export function buildPlanPrompt({ task, context = "", previousPlan = null }) {
         notes: ""
       }]
     }, null, 2),
-    "\nUSER TASK:\n" + task,
-    "\nREPOSITORY CONTEXT:\n" + context,
+
     previousPlan ? "\nPREVIOUS PLAN TO REVISE:\n" + JSON.stringify(previousPlan) : ""
   ].join("\n");
 }
@@ -249,24 +249,29 @@ export class PlanningEngine {
       ? await this.contextEngine.build({ task, messages, maxTokens: Math.min(this.contextTokens, this.contextEngine.maxTokens) })
       : { content: "" };
 
+    const plannerMessages = [
+      { role: "system", content: buildPlanPrompt({ task, context: "", previousPlan }) },
+      {
+        role: "user",
+        content: [
+          "USER TASK:",
+          task,
+          "",
+          "REPOSITORY CONTEXT:",
+          context.content
+        ].join("\n")
+      }
+    ];
+    const requestBudget = budget
+      ? budget.prepare(plannerMessages, this.outputTokens)
+      : { inputTokens: estimateBudgetTokens(plannerMessages), outputTokens: this.outputTokens };
     const response = await this.model.next({
-      messages: [
-        { role: "system", content: buildPlanPrompt({ task, context: "", previousPlan }) },
-        {
-          role: "user",
-          content: [
-            "USER TASK:",
-            task,
-            "",
-            "REPOSITORY CONTEXT:",
-            context.content
-          ].join("\n")
-        }
-      ],
+      messages: plannerMessages,
       toolDefinitions: [],
-      maxTokens: this.outputTokens,
+      maxTokens: requestBudget.outputTokens,
       signal
     });
+    if (budget) budget.record(response.usage);
 
     if (response?.type !== "final") {
       throw new Error("Planner model must return a final JSON plan");
@@ -307,14 +312,15 @@ export class PlanningEngine {
     return plan;
   }
 
-  async replan(task, currentPlan, { signal, reason = "", messages = [] } = {}) {
+  async replan(task, currentPlan, { signal, reason = "", messages = [], budget = null } = {}) {
     return this.create(task, {
       signal,
       messages,
       previousPlan: {
         ...currentPlan,
         replan_reason: reason
-      }
+      },
+      budget
     });
   }
 
