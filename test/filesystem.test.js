@@ -61,13 +61,21 @@ test("prevents lexical workspace escape", async () => {
   }
 });
 
-test("does not follow symlinks while listing", async () => {
+test("does not follow symlinks while listing", async t => {
   const workspace = await createWorkspace();
   const outside = await fs.mkdtemp(path.join(os.tmpdir(), "vexis-outside-"));
 
   try {
     await fs.writeFile(path.join(outside, "secret.txt"), "outside");
-    await fs.symlink(outside, path.join(workspace, "linked"));
+    try {
+      await fs.symlink(outside, path.join(workspace, "linked"));
+    } catch (error) {
+      if (error?.code === "EPERM" || error?.code === "EACCES") {
+        t.skip("Windows symlink creation requires the required OS privilege");
+        return;
+      }
+      throw error;
+    }
 
     const tools = createFilesystemTools({ workspace });
     const result = await tools.list_files.execute({});
@@ -81,16 +89,24 @@ test("does not follow symlinks while listing", async () => {
   }
 });
 
-test("rejects a symlink that points outside the workspace", async () => {
+test("rejects a symlink that points outside the workspace", async t => {
   const workspace = await createWorkspace();
   const outside = await fs.mkdtemp(path.join(os.tmpdir(), "vexis-outside-"));
 
   try {
     await fs.writeFile(path.join(outside, "secret.txt"), "outside");
-    await fs.symlink(
-      path.join(outside, "secret.txt"),
-      path.join(workspace, "secret.txt")
-    );
+    try {
+      await fs.symlink(
+        path.join(outside, "secret.txt"),
+        path.join(workspace, "secret.txt")
+      );
+    } catch (error) {
+      if (error?.code === "EPERM" || error?.code === "EACCES") {
+        t.skip("Windows symlink creation requires the required OS privilege");
+        return;
+      }
+      throw error;
+    }
 
     const tools = createFilesystemTools({ workspace });
 
