@@ -220,6 +220,34 @@ test("compactMessages leaves small requests untouched", () => {
   assert.strictEqual(result.messages, messages);
 });
 
+
+test("agent compacts oversized context before the model request", async () => {
+  const events = [];
+  const model = {
+    async next({ messages }) {
+      assert.ok(messages);
+      return { type: "final", content: "done" };
+    }
+  };
+  const huge = "repository context ".repeat(7000);
+  const agent = new Agent({
+    model,
+    tokenBudget: { maxTotalTokens: 50000, maxInputTokens: 1000, maxOutputTokens: 2000 },
+    contextEngine: {
+      async build() {
+        return { content: huge, tokens: 7000, budget: 7000, candidates: [], truncated: false };
+      }
+    },
+    onEvent: event => events.push(event)
+  });
+  const result = await agent.run("inspect repo");
+  assert.equal(result.status, "completed");
+  const budgetEvent = events.find(event => event.type === "token_budget");
+  assert.ok(budgetEvent);
+  assert.ok(budgetEvent.inputTokens <= 1000);
+  assert.ok(events.some(event => event.type === "context_compacted"));
+});
+
 test("agent creates an execution plan before acting when planning is enabled", async () => {
   const events = [];
   const planningEngine = {
