@@ -250,7 +250,19 @@ export class PlanningEngine {
       : { content: "" };
 
     const response = await this.model.next({
-      messages: [{ role: "system", content: buildPlanPrompt({ task, context: context.content, previousPlan }) }],
+      messages: [
+        { role: "system", content: buildPlanPrompt({ task, context: "", previousPlan }) },
+        {
+          role: "user",
+          content: [
+            "USER TASK:",
+            task,
+            "",
+            "REPOSITORY CONTEXT:",
+            context.content
+          ].join("\n")
+        }
+      ],
       toolDefinitions: [],
       maxTokens: this.outputTokens,
       signal
