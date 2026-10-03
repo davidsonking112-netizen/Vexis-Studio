@@ -96,3 +96,53 @@ test("agent can verify, repair, and verify again", async () => {
   assert.equal(verified, true);
   assert.equal(repaired, true);
 });
+
+
+test("agent executes multiple streaming tool calls concurrently and preserves result order", async () => {
+  const started = [];
+  let releaseSlow;
+  const slowGate = new Promise(resolve => { releaseSlow = resolve; });
+
+  const model = {
+    async next() {
+      return { type: "final", content: "unused" };
+    },
+    async *nextStream({ messages }) {
+      if (messages.length === 1) {
+        yield {
+          type: "complete",
+          response: {
+            type: "tool_calls",
+            calls: [
+              { id: "a", name: "slow", input: { value: 1 } },
+              { id: "b", name: "fast", input: { value: 2 } }
+            ]
+          }
+        };
+        return;
+      }
+      yield { type: "complete", response: { type: "final", content: "done" } };
+    }
+  };
+
+  const agent = new Agent({
+    model,
+    tools: {
+      slow: async input => {
+        started.push("slow");
+        await slowGate;
+        return input.value;
+      },
+      fast: async input => {
+        started.push("fast");
+        releaseSlow();
+        return input.value;
+      }
+    }
+  });
+
+  const result = await agent.run("run both");
+  assert.equal(result.status, "completed");
+  assert.deepEqual(started, ["slow", "fast"]);
+  assert.equal(result.output, "done");
+});
