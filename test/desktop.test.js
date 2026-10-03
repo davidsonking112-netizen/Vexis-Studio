@@ -151,3 +151,41 @@ test("desktop continues accepting tasks after an agent failure", async () => {
     await desktop.stop();
   }
 });
+
+test("desktop exposes a health endpoint and security headers", async () => {
+  const desktop = createDesktop({
+    agent: { run: async () => ({ output: "unused" }) },
+    registry
+  });
+  const address = await desktop.start();
+  try {
+    const health = await fetch(address.url + "api/health");
+    assert.equal(health.status, 200);
+    assert.deepEqual(await health.json(), { status: "ok", service: "vexis-desktop" });
+
+    const page = await fetch(address.url);
+    assert.equal(page.headers.get("x-content-type-options"), "nosniff");
+    assert.match(page.headers.get("content-security-policy"), /default-src 'none'/);
+  } finally {
+    await desktop.stop();
+  }
+});
+
+test("desktop returns structured errors for malformed JSON", async () => {
+  const desktop = createDesktop({
+    agent: { run: async () => ({ output: "unused" }) },
+    registry
+  });
+  const address = await desktop.start();
+  try {
+    const response = await fetch(address.url + "api/task", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{invalid"
+    });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error, "Request body must be valid JSON.");
+  } finally {
+    await desktop.stop();
+  }
+});
