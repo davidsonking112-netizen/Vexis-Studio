@@ -1,10 +1,10 @@
 import { Agent } from "./agent.js";
-import { createFilesystemTools, toAgentTools } from "./tools/filesystem.js";
-import { createCommandTool, toAgentCommandTool } from "./tools/command.js";
-import { createCodebaseTool, toAgentCodebaseTool } from "./tools/codebase.js";
-import { createEditTool, toAgentEditTool } from "./tools/edit.js";
-import { createTestTool, toAgentTestTool } from "./tools/test.js";
-import { createTaskStateTool, toAgentTaskStateTool } from "./tools/task_state.js";
+import { createFilesystemTools } from "./tools/filesystem.js";
+import { createCommandTool } from "./tools/command.js";
+import { createCodebaseTool } from "./tools/codebase.js";
+import { createEditTool } from "./tools/edit.js";
+import { createTestTool } from "./tools/test.js";
+import { createTaskStateTool } from "./tools/task_state.js";
 import { createToolRegistry } from "./tools/registry.js";
 
 const workspace = process.cwd();
@@ -17,12 +17,12 @@ const testTool = createTestTool({ workspace, command });
 const taskState = createTaskStateTool({ workspace });
 
 const registry = createToolRegistry({
-  ...Object.fromEntries(Object.entries(filesystem).map(([name, definition]) => [name, definition])),
-  ...toAgentCommandTool(command),
-  ...toAgentCodebaseTool(codebase),
-  ...toAgentEditTool(edit),
-  ...toAgentTestTool(testTool),
-  ...toAgentTaskStateTool(taskState)
+  ...filesystem,
+  run_command: command,
+  inspect_codebase: codebase,
+  edit_file: edit,
+  run_tests: testTool,
+  task_state: taskState
 });
 
 const tools = registry.toAgentTools();
