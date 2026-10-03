@@ -51,7 +51,7 @@ function normalizePath(value) {
 function lexicalScore(candidate, queryTerms) {
   if (!queryTerms.length) return 0;
 
-  const pathText = candidate.path.toLowerCase();
+  const pathText = String(candidate.path || "").toLowerCase();
   const contentText = String(candidate.content || "").toLowerCase();
   let score = 0;
 
