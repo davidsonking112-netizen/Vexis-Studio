@@ -24,7 +24,7 @@ function commandName(command) {
 }
 
 function appendOutput(state, chunk, maxOutputBytes) {
-  const text = chunk.toString("utf8");
+  const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
   const remaining = maxOutputBytes - state.bytes;
 
   if (remaining <= 0) {
@@ -32,15 +32,15 @@ function appendOutput(state, chunk, maxOutputBytes) {
     return false;
   }
 
-  if (Buffer.byteLength(text, "utf8") > remaining) {
-    state.parts.push(Buffer.from(text, "utf8").subarray(0, remaining).toString("utf8"));
+  if (buffer.byteLength > remaining) {
+    state.parts.push(buffer.subarray(0, remaining));
     state.bytes = maxOutputBytes;
     state.truncated = true;
     return false;
   }
 
-  state.parts.push(text);
-  state.bytes += Buffer.byteLength(text, "utf8");
+  state.parts.push(buffer);
+  state.bytes += buffer.byteLength;
   return true;
 }
 
@@ -121,8 +121,8 @@ export function createCommandTool({
           settled = true;
           resolve({
             ...result,
-            stdout: stdout.parts.join(""),
-            stderr: stderr.parts.join(""),
+            stdout: Buffer.concat(stdout.parts).toString("utf8"),
+            stderr: Buffer.concat(stderr.parts).toString("utf8"),
             stdoutTruncated: stdout.truncated,
             stderrTruncated: stderr.truncated,
             durationMs: Date.now() - startedAt
