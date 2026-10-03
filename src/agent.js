@@ -6,6 +6,7 @@ export class Agent {
 
     this.model = model;
     this.tools = tools;
+    this.toolDefinitions = arguments[0].toolDefinitions || Object.keys(tools).map(name => ({ name, description: "" }));
     this.maxSteps = maxSteps;
     this.onEvent = onEvent;
   }
@@ -20,7 +21,9 @@ export class Agent {
 
       const response = await this.model.next({
         messages,
-        tools: Object.keys(this.tools)
+        tools: Object.keys(this.tools),
+        toolDefinitions: this.toolDefinitions || Object.keys(this.tools).map(name => ({ name })),
+        signal
       });
 
       onEvent({ type: "model_response", step, response });
@@ -60,8 +63,14 @@ export class Agent {
         const observation = { ok: true, result };
 
         messages.push({
+          role: "assistant",
+          content: "",
+          tool_call: { id: response.id || name, name, input: input ?? {} }
+        });
+        messages.push({
           role: "tool",
           name,
+          toolCallId: response.id || name,
           content: JSON.stringify(observation)
         });
 
