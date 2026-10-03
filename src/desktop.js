@@ -983,19 +983,6 @@ export function createDesktop({
       return;
     }
 
-    if (request.method === "DELETE" && url.pathname.startsWith("/api/task/")) {
-      const taskId = decodeURIComponent(url.pathname.slice("/api/task/".length));
-      const state = tasks.get(taskId);
-      if (!state) {
-        sendJson(response, 404, { error: "Task not found" });
-        return;
-      }
-      state.controller.abort();
-      publish(taskId, { type: "task_cancel_requested" });
-      sendJson(response, 202, { status: "cancellation_requested", id: taskId });
-      return;
-    }
-
     if (request.method === "POST" && url.pathname === "/api/task") {
       try {
         const body = await readJson(request);
