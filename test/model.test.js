@@ -134,3 +134,30 @@ test("real model runtime honors cancellation", async () => {
 
   await assert.rejects(pending, /cancelled|timed out/i);
 });
+
+
+test("streaming transport requests SSE and emits text deltas", async () => {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n'));
+      controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"lo"}}],"usage":{"total_tokens":2}}\n\n'));
+      controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+      controller.close();
+    }
+  });
+  const model = new OpenAICompatibleModel({
+    apiKey: "test-key",
+    baseUrl: "https://example.test/v1",
+    model: "test-model",
+    fetchImpl: async (_url, options) => {
+      const request = JSON.parse(options.body);
+      assert.equal(request.stream, true);
+      return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+    }
+  });
+  const events = [];
+  for await (const event of model.nextStream({ messages: [{ role: "user", content: "hi" }] })) events.push(event);
+  assert.equal(events.filter(event => event.type === "text_delta").map(event => event.delta).join(""), "Hello");
+  assert.equal(events.at(-1).type, "complete");
+});
