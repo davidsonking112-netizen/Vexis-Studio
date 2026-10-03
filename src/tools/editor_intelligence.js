@@ -34,7 +34,7 @@ function analyzeDocument(content, path = "") {
     : [/^\s*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm, /^\s*(?:export\s+)?class\s+([A-Za-z_$][\w$]*)/gm, /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)/gm];
   const kinds = language === "python" ? ["function", "class"] : ["function", "class", "variable"];
   for (let i = 0; i < patterns.length; i++) for (const match of content.matchAll(patterns[i])) addSymbol(match[1], kinds[i], match.index + match[0].indexOf(match[1]));
-  if (language === "json") for (const match of content.matchAll(/^\s*"([^"\n]+)"\s*:/gm)) addSymbol(match[1], "property", match.index + match[0].indexOf(match[1]));
+  if (language === "json") for (const match of content.matchAll(/"([^"\n]+)"\s*:/g)) addSymbol(match[1], "property", match.index + match[0].indexOf(match[1]));
   const stack = []; const pairs = { "(": ")", "[": "]", "{": "}" }; const closing = new Set(Object.values(pairs));
   let offset = 0;
   lines.forEach((line, lineIndex) => {
