@@ -147,7 +147,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .run:hover { filter:brightness(1.08); }
 .run:disabled { opacity:.45; cursor:wait; }
 
-.editor-shell { height:100%; min-height:0; display:grid; grid-template-columns:220px minmax(0,1fr); background:rgba(7,9,14,.22); }
+.editor-shell { position:absolute; inset:62px 0 0 0; z-index:3; min-height:0; display:grid; grid-template-columns:220px minmax(0,1fr); background:rgba(7,9,14,.96); }
 .editor-files { border-right:1px solid var(--line); overflow:auto; background:rgba(9,11,17,.58); }
 .editor-files-head { padding:14px 13px 10px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--line); }
 .editor-files-head strong { font-size:10px; letter-spacing:.08em; text-transform:uppercase; }
