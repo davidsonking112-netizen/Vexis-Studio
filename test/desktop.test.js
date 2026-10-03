@@ -227,3 +227,64 @@ test("desktop rejects unsupported HTTP methods", async () => {
     await desktop.stop();
   }
 });
+
+
+test("desktop streams agent events and supports cancellation", async () => {
+  let release;
+  const started = new Promise(resolve => { release = resolve; });
+  const desktop = createDesktop({
+    agent: {
+      run: async (task, { signal, onEvent }) => {
+        onEvent({ type: "model_start", step: 0 });
+        release();
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(resolve, 1000);
+          signal.addEventListener("abort", () => {
+            clearTimeout(timer);
+            reject(new Error("Task cancelled"));
+          }, { once: true });
+        });
+        return { output: task };
+      }
+    },
+    registry: registry()
+  });
+  const address = await desktop.start();
+  try {
+    const id = "cancel-test";
+    const stream = await fetch(address.url + "api/events/" + id);
+    const reader = stream.body.getReader();
+    const first = new TextDecoder().decode((await reader.read()).value);
+    assert.match(first, /Task not found|/);
+
+    const request = json(address.url + "api/task", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, task: "long task" })
+    });
+    await started;
+    const cancelled = await json(address.url + "api/task/" + id, { method: "DELETE" });
+    assert.equal(cancelled.response.status, 202);
+    const result = await request;
+    assert.equal(result.response.status, 200);
+    assert.equal(result.body.status, "cancelled");
+  } finally {
+    await desktop.stop();
+  }
+});
+
+test("agent run supports per-run events and abort signals", async () => {
+  const { Agent } = await import("../src/agent.js");
+  const events = [];
+  const controller = new AbortController();
+  const agent = new Agent({
+    model: { next: async () => ({ type: "final", content: "done" }) },
+    onEvent: () => { throw new Error("global event should not run"); }
+  });
+  const result = await agent.run("task", {
+    signal: controller.signal,
+    onEvent: event => events.push(event.type)
+  });
+  assert.equal(result.output, "done");
+  assert.deepEqual(events, ["model_start", "model_response"]);
+});
