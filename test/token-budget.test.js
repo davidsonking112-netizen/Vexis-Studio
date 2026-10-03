@@ -22,6 +22,6 @@ test("token budget clamps output and records provider usage", () => {
 
 test("token budget exhausts cleanly instead of sending an unbounded request", () => {
   const budget = new TokenBudget({ maxTotalTokens: 300, maxInputTokens: 150, maxOutputTokens: 100 });
-  budget.record({ prompt_tokens: 100, completion_tokens: 100 });
+  budget.record({ prompt_tokens: 200, completion_tokens: 100 });
   assert.throws(() => budget.prepare([{ role: "user", content: "x".repeat(50) }], 100), error => error.code === "VEXIS_TOKEN_BUDGET_EXHAUSTED");
 });
