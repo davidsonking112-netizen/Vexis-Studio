@@ -35,7 +35,7 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 5. **Editing loop** — propose/apply changes and verify them with hash-guarded exact replacements. **Implemented**
 6. **Test/debug loop** — run tests, inspect failures, repair, repeat. **Implemented**
 7. **Persistent task state** — plans, checkpoints, and resumable work. **Implemented**
-8. **Tool/skill system** — extensible capabilities and tool discovery.
+8. **Tool/skill system** — extensible capabilities and tool discovery. **Implemented**
 9. **Interactive CLI** — polished terminal experience.
 10. **Editor integration** — IDE/editor workflow.
 11. **Multi-model runtime** — provider/model abstraction.
@@ -111,3 +111,19 @@ Stage 7 adds a bounded workspace-local task state primitive:
 - exposes the primitive to the agent as `task_state`
 
 The state layer is deliberately independent from model/provider logic so later stages can build richer planning and orchestration on top of a stable persistence contract.
+
+
+## Tool and skill registry boundary
+
+Stage 8 adds a capability registry without changing the existing tool execution contract:
+
+- validates tool names and executable definitions before registration
+- prevents accidental tool-name collisions, with explicit replacement when requested
+- provides deterministic tool listing and text-based discovery
+- converts registered tools directly into the agent's existing function map
+- supports reusable skill definitions that bundle tools
+- keeps skills separate from installed tools until explicitly installed
+- rejects skill/tool collisions before registration
+- exposes deterministic skill discovery and descriptions
+
+The registry is an orchestration layer, not a permission boundary. Tool safety remains owned by the underlying filesystem, command, editing, test, and task-state primitives; stronger authorization and sandboxing remain part of Stage 12.
