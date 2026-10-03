@@ -36,7 +36,7 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 6. **Test/debug loop** — run tests, inspect failures, repair, repeat. **Implemented**
 7. **Persistent task state** — plans, checkpoints, and resumable work. **Implemented**
 8. **Tool/skill system** — extensible capabilities and tool discovery. **Implemented**
-9. **Interactive CLI** — polished terminal experience. **Sector 1 implemented**
+9. **Interactive CLI** — polished terminal experience. **Sectors 1, 2, and 3 implemented**
 10. **Editor integration** — IDE/editor workflow.
 11. **Multi-model runtime** — provider/model abstraction.
 12. **Safety and permissions** — approvals, sandboxing, limits, audit trail.
