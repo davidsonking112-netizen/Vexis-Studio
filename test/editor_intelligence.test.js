@@ -13,7 +13,7 @@ test("editor intelligence detects language and common symbols", () => {
 test("editor intelligence reports structural diagnostics", () => {
   const result = analyzeDocument("function broken() {\n  return (1;\n", "broken.js");
   assert.ok(result.diagnostics.some(d => d.severity === "error" && d.message.startsWith("Unclosed")));
-  assert.ok(result.diagnostics.some(d => d.severity === "error" && d.message.startsWith("Unclosed")));
+  assert.ok(result.diagnostics.some(d => d.severity === "error" && d.message.startsWith("Unexpected")));
 });
 
 test("editor intelligence reports deferred markers and whitespace", () => {
