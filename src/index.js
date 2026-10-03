@@ -3,6 +3,7 @@ import { createFilesystemTools, toAgentTools } from "./tools/filesystem.js";
 import { createCommandTool, toAgentCommandTool } from "./tools/command.js";
 import { createCodebaseTool, toAgentCodebaseTool } from "./tools/codebase.js";
 import { createEditTool, toAgentEditTool } from "./tools/edit.js";
+import { createTestTool, toAgentTestTool } from "./tools/test.js";
 
 const workspace = process.cwd();
 
