@@ -2,17 +2,20 @@ import { Agent } from "./agent.js";
 import { createFilesystemTools, toAgentTools } from "./tools/filesystem.js";
 import { createCommandTool, toAgentCommandTool } from "./tools/command.js";
 import { createCodebaseTool, toAgentCodebaseTool } from "./tools/codebase.js";
+import { createEditTool, toAgentEditTool } from "./tools/edit.js";
 
 const workspace = process.cwd();
 
 const filesystem = createFilesystemTools({ workspace });
 const command = createCommandTool({ workspace });
 const codebase = createCodebaseTool({ workspace, filesystem });
+const edit = createEditTool({ workspace, filesystem });
 
 const tools = {
   ...toAgentTools(filesystem),
   ...toAgentCommandTool(command),
-  ...toAgentCodebaseTool(codebase)
+  ...toAgentCodebaseTool(codebase),
+  ...toAgentEditTool(edit)
 };
 
 const model = {
@@ -41,7 +44,7 @@ const model = {
     if (last?.role === "tool" && last.name === "run_command") {
       return {
         type: "final",
-        content: `Codebase inspection and controlled command execution are operational. Tools: ${availableTools.join(", ")}.`
+        content: `Codebase inspection and controlled command execution are operational. Editing is available through hash-guarded exact replacements. Tools: ${availableTools.join(", ")}.`
       };
     }
 
