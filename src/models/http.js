@@ -232,7 +232,7 @@ export class OpenAICompatibleModel {
   }
 
   async next({ messages, toolDefinitions = [], signal, maxTokens = this.maxTokens }) {
-    if (!Array.isArray(messages)) throw new TypeError("messages must be an array");
+    if (!Array.isArray(messages)) throw new TypeError("messages must be an array");\n    if (!Number.isInteger(maxTokens) || maxTokens < 1) throw new TypeError("maxTokens must be a positive integer");
     if (!Number.isInteger(maxTokens) || maxTokens < 1) throw new TypeError("maxTokens must be a positive integer");
 
     const controller = new AbortController();
@@ -294,7 +294,7 @@ export class OpenAICompatibleModel {
     }
   }
 
-  async *nextStream({ messages, toolDefinitions = [], signal }) {
+  async *nextStream({ messages, toolDefinitions = [], maxTokens = this.maxTokens, signal }) {
     if (!Array.isArray(messages)) throw new TypeError("messages must be an array");
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
@@ -317,7 +317,7 @@ export class OpenAICompatibleModel {
             model: this.model,
             messages: toProviderMessages(messages),
             temperature: 0,
-            max_tokens: this.maxTokens,
+            max_tokens: maxTokens,
             stream: true,
             ...(toolDefinitions.length ? {
               tools: toProviderTools(toolDefinitions),
