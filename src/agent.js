@@ -1,4 +1,4 @@
-import { TokenBudget, DEFAULT_TOKEN_BUDGET } from "./runtime/token-budget.js";
+import { TokenBudget, DEFAULT_TOKEN_BUDGET, compactMessages } from "./runtime/token-budget.js";
 
 export class Agent {
   constructor({ model, tools = {}, toolDefinitions = null, contextEngine = null, planningEngine = null, memory = null, repositoryIntelligence = null, maxSteps = 20, tokenBudget = DEFAULT_TOKEN_BUDGET, onEvent = () => {} }) {
@@ -91,8 +91,21 @@ export class Agent {
       modelMessages = [...memoryMessages, ...messages];
     }
 
+    const compaction = compactMessages(modelMessages, budget.maxInputTokens);
+    modelMessages = compaction.messages;
+    if (compaction.compacted) {
+      onEvent({
+        type: "context_compacted",
+        step,
+        originalTokens: compaction.originalTokens,
+        finalTokens: compaction.finalTokens,
+        droppedMessages: compaction.droppedMessages,
+        truncatedMessages: compaction.truncatedMessages
+      });
+    }
+
     const requestBudget = budget.prepare(modelMessages, null);
-    onEvent({ type: "token_budget", step, ...requestBudget, budget: budget.snapshot() });
+    onEvent({ type: "token_budget", step, ...requestBudget, budget: budget.snapshot(), compacted: compaction.compacted });
     onEvent({ type: "model_start", step, messages: modelMessages });
 
     if (typeof this.model.nextStream === "function") {
