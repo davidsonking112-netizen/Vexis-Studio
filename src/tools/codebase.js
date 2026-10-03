@@ -8,7 +8,7 @@ const MANIFESTS = [
 
 const ENTRY_CANDIDATES = [
   "src/index.js", "src/main.js", "src/app.js", "index.js",
-  "main.py", "app.py", "main.go", "src/main.rs"
+  "main.js", "main.py", "app.py", "main.go", "src/main.rs"
 ];
 
 function isWithin(root, target) {
