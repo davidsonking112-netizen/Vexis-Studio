@@ -150,4 +150,18 @@ The first interface layer provides:
 
 The CLI uses Node's stable readline interface for line-oriented terminal input. citeturn0search0
 
-The TUI and Desktop sectors will be added on top of this runtime boundary rather than becoming separate agent implementations.
+### Stage 9 / Sector 2: TUI
+
+The second interface layer adds a dependency-free terminal workspace:
+
+- full-screen ANSI rendering with a bounded transcript
+- interactive task input with cursor movement and editing
+- Enter-to-run task execution against the shared runtime
+- /help, /tools, /discover <query>, /exit, and /quit commands
+- terminal resize handling
+- Ctrl+C cleanup and terminal-mode restoration
+- non-TTY fallback to the existing CLI so scripting remains usable
+
+The TUI uses Node's keypress events and raw TTY mode rather than introducing a UI framework dependency. Node documents that keypress events on a TTY require raw mode, and TTY streams expose resize events for responsive rendering. citeturn0search0turn0search1
+
+The Desktop sector will reuse this same runtime and keep desktop-specific concerns outside the agent kernel.

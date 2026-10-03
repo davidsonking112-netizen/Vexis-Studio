@@ -7,12 +7,14 @@
   "scripts": {
     "start": "node src/index.js",
     "test": "node --test",
-    "cli": "node src/cli-entry.js"
+    "cli": "node src/cli-entry.js",
+    "tui": "node src/tui-entry.js"
   },
   "engines": {
     "node": ">=20"
   },
   "bin": {
-    "vexis": "src/cli-entry.js"
+    "vexis": "src/cli-entry.js",
+    "vexis-tui": "src/tui-entry.js"
   }
 }
