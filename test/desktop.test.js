@@ -31,6 +31,9 @@ test("desktop serves a local UI and tool endpoints", async () => {
     assert.match(html, /hero-orbit/);
     assert.match(html, /composer-top/);
     assert.match(html, /Workspace connected/);
+    assert.match(html, /editor-tabs/);
+    assert.match(html, /Save all/);
+    assert.match(html, /Unsaved changes/);
 
     const tools = await json(address.url + "api/tools");
     assert.equal(tools.response.status, 200);
@@ -315,6 +318,32 @@ test("desktop editor lists, opens, and hash-guards saves", async () => {
     assert.equal(opened.response.status, 200);
     assert.equal(opened.body.content, "abc");
     assert.equal(opened.body.sha256.length, 64);
+
+    let savedInput;
+    const saveDesktop = createDesktop({
+      agent: { run: async () => ({ output: "unused" }) },
+      registry: registry(),
+      filesystem,
+      edit: { execute: async input => {
+        savedInput = input;
+        return { path: input.path, changed: true, after_sha256: "b".repeat(64) };
+      } }
+    });
+    const saveAddress = await saveDesktop.start();
+    try {
+      const currentSha = opened.body.sha256;
+      const saved = await json(saveAddress.url + "api/editor/file", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ path: "src/demo.js", expected_sha256: currentSha, content: "abcd" })
+      });
+      assert.equal(saved.response.status, 200);
+      assert.equal(savedInput.old_text, "abc");
+      assert.equal(savedInput.new_text, "abcd");
+      assert.equal(savedInput.expected_replacements, 1);
+    } finally {
+      await saveDesktop.stop();
+    }
 
     const stale = await json(address.url + "api/editor/file", {
       method: "POST",
