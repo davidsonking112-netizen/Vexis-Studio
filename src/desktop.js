@@ -9,54 +9,300 @@ const DESKTOP_HTML = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
 <title>Vexis Studio</title>
 <style>
-:root { color-scheme: dark; font-family: system-ui, sans-serif; }
+:root {
+  color-scheme: dark;
+  --bg: #080a0f;
+  --panel: #0e1118;
+  --panel-2: #121620;
+  --panel-3: #171c27;
+  --line: rgba(255,255,255,.08);
+  --line-strong: rgba(255,255,255,.14);
+  --text: #f4f6fb;
+  --muted: #8d96a8;
+  --soft: #b7bfcd;
+  --accent: #8b7cff;
+  --accent-2: #a79cff;
+  --success: #55d69b;
+  --danger: #ff6f82;
+  --shadow: 0 24px 70px rgba(0,0,0,.32);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
 * { box-sizing: border-box; }
-body { margin: 0; background: #111318; color: #eef0f4; height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
-header { padding: 14px 18px; border-bottom: 1px solid #2a2e38; display:flex; justify-content:space-between; }
-main { overflow:auto; padding: 18px; }
-#messages { max-width: 1000px; margin:auto; display:grid; gap:12px; }
-.message { white-space:pre-wrap; padding:12px 14px; border:1px solid #2a2e38; border-radius:10px; }
-.user { background:#191d25; }
-.agent { background:#151820; }
-.system { color:#aeb5c2; }
-.error { border-color:#7d3d45; }
-footer { border-top:1px solid #2a2e38; padding:12px 18px; }
-form { max-width:1000px; margin:auto; display:flex; gap:10px; }
-input { flex:1; min-width:0; background:#0d0f14; color:inherit; border:1px solid #343946; border-radius:8px; padding:12px; }
-button { border:1px solid #4a5160; background:#1d222c; color:inherit; border-radius:8px; padding:0 18px; cursor:pointer; }
-button:disabled { opacity:.5; cursor:wait; }
-#status { font-size:.85rem; color:#9ca4b3; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(900px 500px at 70% -10%, rgba(139,124,255,.13), transparent 60%),
+    radial-gradient(700px 500px at 0% 100%, rgba(71,180,255,.06), transparent 65%),
+    var(--bg);
+  color: var(--text);
+}
+button, input, textarea { font: inherit; }
+button { color: inherit; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.app { height: 100%; display: grid; grid-template-columns: 248px minmax(0,1fr) 280px; }
+.sidebar, .rail { background: rgba(10,12,18,.86); backdrop-filter: blur(18px); }
+.sidebar { border-right: 1px solid var(--line); padding: 18px 14px; display:flex; flex-direction:column; min-width:0; }
+.rail { border-left: 1px solid var(--line); padding: 18px 14px; min-width:0; overflow:auto; }
+.brand { display:flex; align-items:center; gap:10px; padding: 3px 7px 22px; }
+.logo { width:32px; height:32px; display:grid; place-items:center; border-radius:10px; background:linear-gradient(135deg,var(--accent),#55b8ff); box-shadow:0 8px 28px rgba(139,124,255,.25); font-weight:800; }
+.brand strong { font-size:15px; letter-spacing:-.02em; }
+.brand span { display:block; color:var(--muted); font-size:11px; margin-top:2px; }
+.section-label { color:#687184; font-size:10px; text-transform:uppercase; letter-spacing:.12em; padding:0 8px 8px; }
+.nav { display:grid; gap:4px; }
+.nav button {
+  border:1px solid transparent; background:transparent; text-align:left; border-radius:9px;
+  padding:9px 10px; color:var(--soft); cursor:pointer; display:flex; gap:9px; align-items:center;
+}
+.nav button:hover, .nav button.active { background:var(--panel-3); border-color:var(--line); color:var(--text); }
+.nav .dot { width:7px; height:7px; border-radius:50%; background:#596276; }
+.nav .active .dot { background:var(--accent); box-shadow:0 0 12px var(--accent); }
+.workspace { margin-top:auto; border-top:1px solid var(--line); padding-top:14px; }
+.workspace-card { padding:11px; background:var(--panel); border:1px solid var(--line); border-radius:11px; }
+.workspace-card .label { color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
+.workspace-card .path { margin-top:5px; font-size:12px; color:var(--soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.main { min-width:0; display:grid; grid-template-rows:58px minmax(0,1fr) auto; }
+.topbar { border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; padding:0 20px; background:rgba(8,10,15,.52); backdrop-filter:blur(18px); }
+.breadcrumb { display:flex; align-items:center; gap:8px; min-width:0; }
+.breadcrumb strong { font-size:13px; }
+.breadcrumb span { color:var(--muted); font-size:12px; }
+.status { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:11px; }
+.status-dot { width:7px; height:7px; border-radius:50%; background:var(--success); box-shadow:0 0 12px rgba(85,214,155,.7); }
+.status-dot.busy { background:#f4c95d; box-shadow:0 0 12px rgba(244,201,93,.65); animation:pulse 1s infinite; }
+.status-dot.error { background:var(--danger); box-shadow:0 0 12px rgba(255,111,130,.65); }
+@keyframes pulse { 50% { opacity:.35; } }
+
+.conversation { overflow:auto; scroll-behavior:smooth; }
+.empty { max-width:760px; margin:0 auto; min-height:100%; display:grid; place-items:center; padding:55px 24px; }
+.hero { text-align:center; }
+.hero .mark { width:58px; height:58px; margin:0 auto 18px; display:grid; place-items:center; border:1px solid var(--line-strong); border-radius:17px; background:linear-gradient(145deg,#181c2a,#10131b); box-shadow:var(--shadow); font-size:25px; }
+.hero h1 { margin:0; font-size:27px; letter-spacing:-.04em; }
+.hero p { margin:9px auto 24px; max-width:520px; color:var(--muted); line-height:1.55; font-size:13px; }
+.suggestions { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+.suggestion { border:1px solid var(--line-strong); background:rgba(18,22,32,.7); border-radius:999px; color:var(--soft); padding:8px 11px; cursor:pointer; font-size:11px; }
+.suggestion:hover { border-color:rgba(139,124,255,.55); color:var(--text); background:rgba(139,124,255,.08); }
+
+.messages { max-width:900px; margin:0 auto; padding:28px 24px 32px; display:grid; gap:18px; }
+.message { display:grid; grid-template-columns:30px minmax(0,1fr); gap:11px; }
+.avatar { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; font-size:10px; font-weight:700; border:1px solid var(--line); background:var(--panel-2); }
+.message.user .avatar { background:#191d29; color:var(--accent-2); }
+.message.agent .avatar { background:rgba(139,124,255,.12); color:var(--accent-2); }
+.message.error .avatar { color:var(--danger); }
+.message-body { min-width:0; }
+.message-meta { color:var(--muted); font-size:10px; margin:2px 0 6px; }
+.message-content { color:#e7eaf0; white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; line-height:1.65; }
+.message.user .message-content { color:var(--text); }
+.message.error .message-content { color:#ffb1bb; }
+
+.composer-wrap { padding:12px 20px 18px; }
+.composer { max-width:900px; margin:auto; border:1px solid var(--line-strong); background:rgba(17,21,30,.92); border-radius:15px; box-shadow:0 14px 45px rgba(0,0,0,.25); overflow:hidden; }
+.composer textarea { width:100%; resize:none; min-height:54px; max-height:180px; border:0; outline:0; background:transparent; color:var(--text); padding:14px 15px 5px; line-height:1.45; }
+.composer textarea::placeholder { color:#687184; }
+.composer-actions { display:flex; align-items:center; justify-content:space-between; padding:7px 9px 9px 13px; }
+.hint { color:#697285; font-size:10px; }
+.run { border:1px solid rgba(139,124,255,.5); background:linear-gradient(135deg,#7566ed,#8b7cff); color:white; border-radius:9px; padding:8px 14px; font-size:11px; font-weight:650; cursor:pointer; box-shadow:0 6px 20px rgba(139,124,255,.2); }
+.run:hover { filter:brightness(1.08); }
+.run:disabled { opacity:.45; cursor:wait; }
+
+.rail h2 { font-size:12px; margin:3px 7px 15px; letter-spacing:-.01em; }
+.panel { border:1px solid var(--line); background:rgba(14,17,24,.72); border-radius:11px; margin-bottom:10px; overflow:hidden; }
+.panel-title { padding:10px 11px; color:var(--soft); font-size:10px; text-transform:uppercase; letter-spacing:.08em; border-bottom:1px solid var(--line); }
+.tool { padding:9px 11px; border-bottom:1px solid var(--line); }
+.tool:last-child { border-bottom:0; }
+.tool strong { display:block; font-size:11px; }
+.tool span { display:block; color:var(--muted); font-size:10px; margin-top:3px; line-height:1.4; }
+.search { margin:0 0 10px; width:100%; border:1px solid var(--line-strong); background:var(--panel); color:var(--text); border-radius:9px; padding:9px 10px; font-size:11px; }
+.activity { padding:11px; color:var(--muted); font-size:10px; line-height:1.55; }
+.activity strong { color:var(--soft); }
+.shortcut { display:flex; justify-content:space-between; padding:8px 11px; border-bottom:1px solid var(--line); color:var(--muted); font-size:10px; }
+kbd { border:1px solid var(--line-strong); background:var(--panel-3); color:var(--soft); padding:2px 5px; border-radius:4px; font-size:9px; }
+
+@media (max-width: 1050px) { .app { grid-template-columns:210px minmax(0,1fr); } .rail { display:none; } }
+@media (max-width: 700px) {
+  .app { grid-template-columns:1fr; }
+  .sidebar { display:none; }
+  .topbar { padding:0 14px; }
+  .composer-wrap { padding:10px 10px 12px; }
+  .messages { padding:20px 14px 25px; }
+  .empty { padding:35px 18px; }
+}
 </style>
 </head>
 <body>
-<header><strong>Vexis Studio</strong><span id="status">Ready</span></header>
-<main><section id="messages"><div class="message system">Desktop shell ready. Enter a coding task.</div></section></main>
-<footer><form id="task-form"><input id="task" autocomplete="off" placeholder="Ask Vexis to inspect or change the workspace…"><button id="run" type="submit">Run</button></form></footer>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">V</div><div><strong>Vexis Studio</strong><span>AI coding workspace</span></div></div>
+    <div class="section-label">Workspace</div>
+    <nav class="nav">
+      <button class="active" type="button"><span class="dot"></span>Agent</button>
+      <button id="tools-nav" type="button"><span class="dot"></span>Tools</button>
+      <button id="discover-nav" type="button"><span class="dot"></span>Discover</button>
+    </nav>
+    <div class="workspace">
+      <div class="workspace-card"><div class="label">Connected workspace</div><div class="path" title="Local Vexis workspace">Local workspace</div></div>
+    </div>
+  </aside>
+
+  <section class="main">
+    <header class="topbar">
+      <div class="breadcrumb"><strong>Agent</strong><span>•</span><span>Workspace session</span></div>
+      <div class="status"><span id="status-dot" class="status-dot"></span><span id="status">Ready</span></div>
+    </header>
+
+    <main id="conversation" class="conversation">
+      <section id="empty" class="empty">
+        <div class="hero">
+          <div class="mark">✦</div>
+          <h1>Build with Vexis</h1>
+          <p>Ask Vexis to understand the codebase, make a safe change, run tests, or investigate a failure. The workspace stays behind one consistent agent runtime.</p>
+          <div class="suggestions">
+            <button class="suggestion" data-task="Inspect this codebase and summarize its architecture">Inspect the codebase</button>
+            <button class="suggestion" data-task="Run the test suite and explain any failures">Run the tests</button>
+            <button class="suggestion" data-task="Find the main application entrypoint">Find the entrypoint</button>
+          </div>
+        </div>
+      </section>
+      <section id="messages" class="messages" hidden></section>
+    </main>
+
+    <div class="composer-wrap">
+      <form id="task-form" class="composer">
+        <textarea id="task" rows="2" autocomplete="off" placeholder="Ask Vexis to work on your code…"></textarea>
+        <div class="composer-actions">
+          <span class="hint"><kbd>Enter</kbd> run · <kbd>Shift</kbd>+<kbd>Enter</kbd> newline · <kbd>Esc</kbd> clear</span>
+          <button id="run" class="run" type="submit">Run task ↵</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <aside class="rail">
+    <h2>Workspace context</h2>
+    <div class="panel">
+      <div class="panel-title">Tools</div>
+      <input id="tool-search" class="search" placeholder="Filter tools…" aria-label="Filter tools">
+      <div id="tools"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Activity</div>
+      <div id="activity" class="activity">Ready for a task.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Shortcuts</div>
+      <div class="shortcut"><span>Focus composer</span><kbd>⌘ / Ctrl K</kbd></div>
+      <div class="shortcut"><span>Run task</span><kbd>Enter</kbd></div>
+      <div class="shortcut"><span>Clear input</span><kbd>Esc</kbd></div>
+    </div>
+  </aside>
+</div>
+
 <script>
 const messages = document.getElementById("messages");
+const empty = document.getElementById("empty");
+const conversation = document.getElementById("conversation");
 const form = document.getElementById("task-form");
 const input = document.getElementById("task");
 const button = document.getElementById("run");
 const status = document.getElementById("status");
+const statusDot = document.getElementById("status-dot");
+const activity = document.getElementById("activity");
+const tools = document.getElementById("tools");
+const toolSearch = document.getElementById("tool-search");
+let toolList = [];
+
+function setStatus(text, mode = "ready") {
+  status.textContent = text;
+  statusDot.className = "status-dot" + (mode === "busy" ? " busy" : mode === "error" ? " error" : "");
+}
 
 function addMessage(role, content) {
-  const el = document.createElement("div");
-  el.className = "message " + role;
-  el.textContent = "[" + role + "] " + String(content ?? "");
-  messages.appendChild(el);
-  el.scrollIntoView({ block: "end" });
+  empty.hidden = true;
+  messages.hidden = false;
+  const article = document.createElement("article");
+  article.className = "message " + role;
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = role === "user" ? "YOU" : role === "error" ? "!" : "VX";
+  const body = document.createElement("div");
+  body.className = "message-body";
+  const meta = document.createElement("div");
+  meta.className = "message-meta";
+  meta.textContent = role === "user" ? "You" : role === "error" ? "Vexis · error" : "Vexis · agent";
+  const contentEl = document.createElement("div");
+  contentEl.className = "message-content";
+  contentEl.textContent = String(content ?? "");
+  body.append(meta, contentEl);
+  article.append(avatar, body);
+  messages.appendChild(article);
+  conversation.scrollTop = conversation.scrollHeight;
 }
+
+function renderTools(filter = "") {
+  const query = filter.trim().toLowerCase();
+  const visible = toolList.filter(tool => !query || tool.name.toLowerCase().includes(query) || tool.description.toLowerCase().includes(query));
+  tools.replaceChildren();
+  if (!visible.length) {
+    const emptyTool = document.createElement("div");
+    emptyTool.className = "activity";
+    emptyTool.textContent = "No matching tools.";
+    tools.appendChild(emptyTool);
+    return;
+  }
+  for (const tool of visible) {
+    const item = document.createElement("div");
+    item.className = "tool";
+    const name = document.createElement("strong");
+    name.textContent = tool.name;
+    const description = document.createElement("span");
+    description.textContent = tool.description;
+    item.append(name, description);
+    tools.appendChild(item);
+  }
+}
+
+async function loadTools() {
+  try {
+    const response = await fetch("/api/tools");
+    if (!response.ok) throw new Error("Unable to load tools");
+    const data = await response.json();
+    toolList = Array.isArray(data.tools) ? data.tools : [];
+    renderTools();
+  } catch (error) {
+    activity.textContent = error.message;
+  }
+}
+
+function resizeInput() {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 180) + "px";
+}
+input.addEventListener("input", resizeInput);
+toolSearch.addEventListener("input", () => renderTools(toolSearch.value));
+
+document.querySelectorAll(".suggestion").forEach(buttonEl => {
+  buttonEl.addEventListener("click", () => {
+    input.value = buttonEl.dataset.task || "";
+    resizeInput();
+    input.focus();
+  });
+});
 
 form.addEventListener("submit", async event => {
   event.preventDefault();
   const task = input.value.trim();
-  if (!task) return;
+  if (!task || button.disabled) return;
   addMessage("user", task);
   input.value = "";
+  resizeInput();
   button.disabled = true;
-  status.textContent = "Working…";
+  setStatus("Working…", "busy");
+  activity.innerHTML = "<strong>Agent active.</strong><br>Executing the task through the shared runtime.";
   try {
     const response = await fetch("/api/task", {
       method: "POST",
@@ -65,18 +311,44 @@ form.addEventListener("submit", async event => {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Request failed");
-    addMessage(data.error ? "error" : "agent", data.output || "Task completed.");
+    addMessage("agent", data.output || "Task completed.");
+    activity.innerHTML = "<strong>Last task</strong><br>Completed successfully.";
+    setStatus("Ready");
   } catch (error) {
     addMessage("error", error.message);
+    activity.innerHTML = "<strong>Last task</strong><br>Failed. See the conversation for details.";
+    setStatus("Needs attention", "error");
   } finally {
     button.disabled = false;
-    status.textContent = "Ready";
     input.focus();
   }
 });
+
+input.addEventListener("keydown", event => {
+  if (event.key === "Escape") { input.value = ""; resizeInput(); }
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    form.requestSubmit();
+  }
+});
+document.addEventListener("keydown", event => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    input.focus();
+  }
+});
+document.getElementById("tools-nav").addEventListener("click", () => toolSearch.focus());
+document.getElementById("discover-nav").addEventListener("click", () => {
+  toolSearch.focus();
+  toolSearch.value = "";
+  renderTools();
+});
+loadTools();
+input.focus();
 </script>
 </body>
 </html>`;
+
 
 function sendJson(response, status, payload) {
   const body = JSON.stringify(payload);
