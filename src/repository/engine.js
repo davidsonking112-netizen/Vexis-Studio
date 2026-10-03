@@ -80,6 +80,14 @@ export class RepositoryIntelligence {
     this.snapshot = null;
   }
 
+  get description() {
+    return "Inspect bounded repository structure, symbols, and local dependency relationships for code-aware agent reasoning.";
+  }
+
+  get input() {
+    return { action: "inspect, search_symbols, dependencies, refresh, or stats", query: "optional symbol/file search query", file: "optional workspace-relative file", limit: "optional result limit", refresh: "optional force reindex" };
+  }
+
   async index({ force=false }={}) {
     if (this.snapshot && !force) return this.snapshot;
     const listing = await this.filesystem.list_files.execute({path:".",max_entries:this.maxFiles});
