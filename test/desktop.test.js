@@ -23,7 +23,10 @@ test("desktop serves a local UI and tool endpoints", async () => {
   try {
     const page = await fetch(address.url);
     assert.equal(page.status, 200);
-    assert.match(await page.text(), /Vexis Studio/);
+    const html = await page.text();
+    assert.match(html, /Vexis Studio/);
+    assert.match(html, /\/api\/discover\?q=/);
+    assert.match(html, /Discover/);
 
     const tools = await json(address.url + "api/tools");
     assert.equal(tools.response.status, 200);
@@ -203,6 +206,23 @@ test("desktop converts unexpected handler failures into HTTP 500 responses", asy
     const response = await fetch(address.url + "api/tools");
     assert.equal(response.status, 500);
     assert.equal((await response.json()).error, "registry unavailable");
+  } finally {
+    await desktop.stop();
+  }
+});
+
+
+test("desktop rejects unsupported HTTP methods", async () => {
+  const desktop = createDesktop({
+    agent: { run: async () => ({ output: "unused" }) },
+    registry
+  });
+  const address = await desktop.start();
+  try {
+    const response = await fetch(address.url + "api/tools", { method: "DELETE" });
+    assert.equal(response.status, 405);
+    assert.equal(response.headers.get("allow"), "GET, POST, HEAD");
+    assert.equal((await response.json()).error, "Method not allowed");
   } finally {
     await desktop.stop();
   }
