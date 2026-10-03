@@ -50,8 +50,14 @@ export class Agent {
       if (!tool) {
         const error = { ok: false, error: `Unknown tool: ${name}` };
         messages.push({
+          role: "assistant",
+          content: "",
+          tool_call: { id: response.id || name, name, input: input ?? {} }
+        });
+        messages.push({
           role: "tool",
           name,
+          toolCallId: response.id || name,
           content: JSON.stringify(error)
         });
         onEvent({ type: "tool_error", step, name, error });
