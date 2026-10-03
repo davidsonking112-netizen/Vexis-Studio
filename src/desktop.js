@@ -280,7 +280,7 @@ async function loadTools() {
   }
 }
 
-async function discoverTools(query = "") {
+async async function discoverTools(query = "") {
   try {
     const response = await fetch("/api/discover?q=" + encodeURIComponent(query));
     if (!response.ok) throw new Error("Unable to discover tools");
