@@ -33,6 +33,9 @@ test("desktop serves a local UI and tool endpoints", async () => {
     assert.match(html, /Workspace connected/);
     assert.match(html, /editor-tabs/);
     assert.match(html, /Save all/);
+    assert.match(html, /Preview/);
+    assert.match(html, /diff-backdrop/);
+    assert.match(html, /buildEditorDiff/);
     assert.match(html, /Unsaved changes/);
 
     const tools = await json(address.url + "api/tools");
