@@ -6,6 +6,8 @@ const PRIORITIES = new Set(["critical", "high", "normal", "low"]);
 const MAX_STEPS = 100;
 const MAX_DEPENDENCIES = 20;
 const MAX_TEXT = 4_000;
+const DEFAULT_PLANNER_CONTEXT_TOKENS = 6_000;
+const DEFAULT_PLANNER_OUTPUT_TOKENS = 4_096;
 
 function text(value, name, { required = false, max = MAX_TEXT } = {}) {
   const valueText = String(value ?? "").trim();
@@ -227,7 +229,7 @@ export function buildPlanPrompt({ task, context = "", previousPlan = null }) {
 }
 
 export class PlanningEngine {
-  constructor({ model, contextEngine = null, taskState = null, maxSteps = MAX_STEPS } = {}) {
+  constructor({ model, contextEngine = null, taskState = null, maxSteps = MAX_STEPS, contextTokens = DEFAULT_PLANNER_CONTEXT_TOKENS, outputTokens = DEFAULT_PLANNER_OUTPUT_TOKENS } = {}) {
     if (!model || typeof model.next !== "function") throw new TypeError("model.next is required");
     if (contextEngine && typeof contextEngine.build !== "function") throw new TypeError("contextEngine must provide build()");
     if (taskState && typeof taskState.execute !== "function") throw new TypeError("taskState must provide execute()");
@@ -235,17 +237,22 @@ export class PlanningEngine {
     this.contextEngine = contextEngine;
     this.taskState = taskState;
     this.maxSteps = Math.min(MAX_STEPS, Math.max(1, maxSteps));
+    if (!Number.isInteger(contextTokens) || contextTokens < 1) throw new TypeError("contextTokens must be a positive integer");
+    if (!Number.isInteger(outputTokens) || outputTokens < 1) throw new TypeError("outputTokens must be a positive integer");
+    this.contextTokens = contextTokens;
+    this.outputTokens = outputTokens;
   }
 
   async create(task, { signal, previousPlan = null, messages = [] } = {}) {
     if (signal?.aborted) throw new Error("Planning cancelled");
     const context = this.contextEngine
-      ? await this.contextEngine.build({ task, messages, maxTokens: Math.min(12_000, this.contextEngine.maxTokens * 2) })
+      ? await this.contextEngine.build({ task, messages, maxTokens: Math.min(this.contextTokens, this.contextEngine.maxTokens) })
       : { content: "" };
 
     const response = await this.model.next({
       messages: [{ role: "system", content: buildPlanPrompt({ task, context: context.content, previousPlan }) }],
       toolDefinitions: [],
+      maxTokens: this.outputTokens,
       signal
     });
 
