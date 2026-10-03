@@ -88,8 +88,14 @@ export class Agent {
         };
 
         messages.push({
+          role: "assistant",
+          content: "",
+          tool_call: { id: response.id || name, name, input: input ?? {} }
+        });
+        messages.push({
           role: "tool",
           name,
+          toolCallId: response.id || name,
           content: JSON.stringify(observation)
         });
 
