@@ -225,6 +225,14 @@ function setStatus(text, mode = "ready") {
   statusDot.className = "status-dot" + (mode === "busy" ? " busy" : mode === "error" ? " error" : "");
 }
 
+function persistMessages() {
+  const data = [...messages.querySelectorAll(".message")].map(article => ({
+    role: article.classList.contains("user") ? "user" : article.classList.contains("error") ? "error" : "agent",
+    content: article.querySelector(".message-content")?.textContent || ""
+  }));
+  localStorage.setItem("vexis-session", JSON.stringify(data.slice(-100)));
+}
+
 function addMessage(role, content) {
   empty.hidden = true;
   messages.hidden = false;
@@ -245,6 +253,7 @@ function addMessage(role, content) {
   article.append(avatar, body);
   messages.appendChild(article);
   conversation.scrollTop = conversation.scrollHeight;
+  persistMessages();
 }
 
 function renderTools(filter = "", source = toolList) {
@@ -328,7 +337,7 @@ document.querySelectorAll(".suggestion").forEach(buttonEl => {
 form.addEventListener("submit", async event => {
   event.preventDefault();
   const task = input.value.trim();
-  if (!task || button.disabled) return;
+  if (!task || button.disabled || activeTaskId) return;
   addMessage("user", task);
   input.value = "";
   resizeInput();
@@ -417,6 +426,11 @@ document.getElementById("discover-nav").addEventListener("click", async () => {
 });
 
 loadTools();
+
+try {
+  const saved = JSON.parse(localStorage.getItem("vexis-session") || "[]");
+  if (Array.isArray(saved)) for (const item of saved) addMessage(item.role, item.content);
+} catch {}
 input.focus();
 </script>
 </body>
