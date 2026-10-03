@@ -56,6 +56,9 @@ export function createCommandTool({
   }
 
   const root = path.resolve(workspace);
+  const allowed = new Set(
+    [...allowedCommands].map(value => commandName(String(value)))
+  );
 
   return {
     description: "Run an approved development command in the workspace without invoking a shell.",
@@ -76,7 +79,7 @@ export function createCommandTool({
 
       const name = commandName(command);
 
-      if (!allowedCommands.has(name)) {
+      if (!allowed.has(name)) {
         throw new Error(`Command is not allowed: ${name}`);
       }
 
