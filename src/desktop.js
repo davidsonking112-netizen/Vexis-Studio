@@ -140,7 +140,7 @@ kbd { border:1px solid var(--line-strong); background:var(--panel-3); color:var(
     <div class="brand"><div class="logo">V</div><div><strong>Vexis Studio</strong><span>AI coding workspace</span></div></div>
     <div class="section-label">Workspace</div>
     <nav class="nav">
-      <button class="active" type="button"><span class="dot"></span>Agent</button>
+      <button id="agent-nav" class="active" type="button"><span class="dot"></span>Agent</button>
       <button id="tools-nav" type="button"><span class="dot"></span>Tools</button>
       <button id="discover-nav" type="button"><span class="dot"></span>Discover</button>
     </nav>
@@ -185,7 +185,7 @@ kbd { border:1px solid var(--line-strong); background:var(--panel-3); color:var(
   <aside class="rail">
     <h2>Workspace context</h2>
     <div class="panel">
-      <div class="panel-title">Tools</div>
+      <div class="panel-title"><span id="tools-title">Tools</span><span id="tool-count"></span></div>
       <input id="tool-search" class="search" placeholder="Filter tools…" aria-label="Filter tools">
       <div id="tools"></div>
     </div>
@@ -215,6 +215,7 @@ const activity = document.getElementById("activity");
 const tools = document.getElementById("tools");
 const toolSearch = document.getElementById("tool-search");
 let toolList = [];
+let activeView = "agent";
 
 function setStatus(text, mode = "ready") {
   status.textContent = text;
@@ -243,9 +244,10 @@ function addMessage(role, content) {
   conversation.scrollTop = conversation.scrollHeight;
 }
 
-function renderTools(filter = "") {
+function renderTools(filter = "", source = toolList) {
   const query = filter.trim().toLowerCase();
-  const visible = toolList.filter(tool => !query || tool.name.toLowerCase().includes(query) || tool.description.toLowerCase().includes(query));
+  const visible = source.filter(tool => !query || tool.name.toLowerCase().includes(query) || tool.description.toLowerCase().includes(query));
+  document.getElementById("tool-count").textContent = visible.length ? " " + visible.length : "";
   tools.replaceChildren();
   if (!visible.length) {
     const emptyTool = document.createElement("div");
@@ -278,12 +280,39 @@ async function loadTools() {
   }
 }
 
+async function discoverTools(query = "") {
+  try {
+    const response = await fetch("/api/discover?q=" + encodeURIComponent(query));
+    if (!response.ok) throw new Error("Unable to discover tools");
+    const data = await response.json();
+    const discovered = Array.isArray(data.tools) ? data.tools : [];
+    renderTools("", discovered);
+    document.getElementById("tools-title").textContent = query ? "Discover · " + query : "Discover";
+    activity.innerHTML = "<strong>Discovery</strong><br>" + discovered.length + " matching tools.";
+  } catch (error) {
+    activity.textContent = error.message;
+  }
+}
+
+function selectView(view) {
+  activeView = view;
+  document.querySelectorAll(".nav button").forEach(buttonEl => buttonEl.classList.remove("active"));
+  document.getElementById(view + "-nav").classList.add("active");
+}
+
 function resizeInput() {
   input.style.height = "auto";
   input.style.height = Math.min(input.scrollHeight, 180) + "px";
 }
 input.addEventListener("input", resizeInput);
-toolSearch.addEventListener("input", () => renderTools(toolSearch.value));
+toolSearch.addEventListener("input", async () => {
+  if (activeView === "discover") {
+    await discoverTools(toolSearch.value);
+    return;
+  }
+  document.getElementById("tools-title").textContent = "Tools";
+  renderTools(toolSearch.value);
+});
 
 document.querySelectorAll(".suggestion").forEach(buttonEl => {
   buttonEl.addEventListener("click", () => {
@@ -337,12 +366,26 @@ document.addEventListener("keydown", event => {
     input.focus();
   }
 });
-document.getElementById("tools-nav").addEventListener("click", () => toolSearch.focus());
-document.getElementById("discover-nav").addEventListener("click", () => {
-  toolSearch.focus();
+document.getElementById("agent-nav").addEventListener("click", () => {
+  selectView("agent");
+  input.focus();
+});
+document.getElementById("tools-nav").addEventListener("click", () => {
+  selectView("tools");
+  document.getElementById("tools-title").textContent = "Tools";
   toolSearch.value = "";
   renderTools();
+  toolSearch.focus();
 });
+document.getElementById("discover-nav").addEventListener("click", async () => {
+  selectView("discover");
+  toolSearch.value = "";
+  toolSearch.placeholder = "Search capabilities…";
+  document.getElementById("tools-title").textContent = "Discover";
+  await discoverTools("");
+  toolSearch.focus();
+});
+
 loadTools();
 input.focus();
 </script>
@@ -367,7 +410,7 @@ function sendHtml(response, html) {
     "content-length": Buffer.byteLength(html),
     "cache-control": "no-store",
     "x-content-type-options": "nosniff",
-    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'"
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
   });
   response.end(html);
 }
@@ -449,7 +492,12 @@ export function createDesktop({
       return;
     }
 
-    sendJson(response, 404, { error: "Not found" });
+    if (["GET", "POST", "HEAD"].includes(request.method)) {
+      sendJson(response, 404, { error: "Not found" });
+      return;
+    }
+    response.setHeader("allow", "GET, POST, HEAD");
+    sendJson(response, 405, { error: "Method not allowed" });
   };
 
   async function start() {
