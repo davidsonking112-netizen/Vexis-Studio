@@ -1,5 +1,33 @@
 import { normalizeModelResponse } from "./model.js";
 
+function streamEvents(response) {
+  if (!response?.body?.getReader) throw new TypeError("Streaming response body is required");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  return (async function* () {
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let split;
+        while ((split = buffer.indexOf("\n\n")) >= 0) {
+          const frame = buffer.slice(0, split).replace(/\r/g, "");
+          buffer = buffer.slice(split + 2);
+          const data = frame.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trimStart()).join("\n");
+          if (data === "[DONE]") return;
+          if (data) yield JSON.parse(data);
+        }
+      }
+      buffer += decoder.decode();
+      const frame = buffer.trim().replace(/\r/g, "");
+      const data = frame.startsWith("data:") ? frame.slice(5).trimStart() : "";
+      if (data && data !== "[DONE]") yield JSON.parse(data);
+    } finally { try { await reader.cancel(); } catch {} }
+  })();
+}
+
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_MODEL = "gpt-5";
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -147,7 +175,7 @@ export class OpenAICompatibleModel {
     };
   }
 
-  async next({ messages, toolDefinitions = [], signal }) {
+  async *nextStream({ messages, toolDefinitions = [], signal }) {\n    if (!Array.isArray(messages)) throw new TypeError("messages must be an array");\n    const controller = new AbortController();\n    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);\n    const abort = () => controller.abort();\n    signal?.addEventListener("abort", abort, { once: true });\n    try {\n      const headers = { "content-type": "application/json", ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}) };\n      const body = { model: this.model, messages: toProviderMessages(messages), temperature: 0, stream: true, tools: toProviderTools(toolDefinitions), tool_choice: toolDefinitions.length ? "auto" : undefined };\n      const response = await this.fetch(`${this.baseUrl}/chat/completions`, { method: "POST", headers, body: JSON.stringify(body), signal: controller.signal });\n      if (!response.ok) { const text = await response.text(); const payload = text ? parseJson(text) : {}; throw providerError(response, payload, this.provider); }\n      let text = ""; const calls = new Map(); let usage = null;\n      for await (const chunk of streamEvents(response)) {\n        usage = chunk.usage ?? usage;\n        const choice = chunk.choices?.[0]; const delta = choice?.delta || {};\n        if (delta.content) { text += delta.content; yield { type: "text_delta", delta: delta.content, provider: this.provider, model: this.model }; }\n        for (const call of delta.tool_calls || []) {\n          const index = call.index ?? 0; const current = calls.get(index) || { id: "", name: "", arguments: "" };\n          current.id += call.id || ""; current.name += call.function?.name || ""; current.arguments += call.function?.arguments || ""; calls.set(index, current);\n          yield { type: "tool_call_delta", index, id: current.id || null, name: current.name || null, argumentsDelta: call.function?.arguments || "", provider: this.provider, model: this.model };\n        }\n        if (choice?.finish_reason) yield { type: "finish", reason: choice.finish_reason, usage, provider: this.provider, model: this.model };\n      }\n      for (const [index, call] of calls) { let input = {}; try { input = call.arguments ? JSON.parse(call.arguments) : {}; } catch { throw new Error(`Model returned invalid JSON arguments for tool ${call.name}`); } yield { type: "tool_call", index, id: call.id || call.name, name: call.name, input, provider: this.provider, model: this.model }; }\n      yield { type: "complete", response: normalizeModelResponse(calls.size ? { type: "tool_calls", calls: [...calls.values()].map(call => ({ id: call.id || call.name, name: call.name, input: call.arguments ? JSON.parse(call.arguments) : {} })) , usage, provider: this.provider, model: this.model } : { type: "final", content: text, usage, provider: this.provider, model: this.model }) };\n    } catch (error) {\n      if (signal?.aborted) throw new Error("Model request cancelled");\n      if (error?.name === "AbortError") throw new Error(`Model request timed out after ${this.timeoutMs}ms`);\n      throw error;\n    } finally { clearTimeout(timeout); signal?.removeEventListener("abort", abort); }\n  }\n\n  async next({ messages, toolDefinitions = [], signal }) {
     if (!Array.isArray(messages)) throw new TypeError("messages must be an array");
 
     const controller = new AbortController();
