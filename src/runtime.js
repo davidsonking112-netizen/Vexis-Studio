@@ -1,5 +1,6 @@
 import { Agent } from "./agent.js";
-import { createConfiguredModel, createDefaultProviderRegistry, loadModelProfiles } from "./models/config.js";
+import { createConfiguredModel, loadModelProfiles } from "./models/config.js";
+import { createDefaultProviderRegistry } from "./models/providers.js";
 import { assertModel } from "./models/model.js";
 import { createFilesystemTools } from "./tools/filesystem.js";
 import { createCommandTool } from "./tools/command.js";
