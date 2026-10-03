@@ -98,7 +98,11 @@ export function createCodebaseTool({
         }
       }
 
-      const entryPoints = ENTRY_CANDIDATES
+      const scopedCandidates = relativeRoot
+        ? ["index.js", "main.js", "app.js", "main.py", "app.py", "main.go", "main.rs"]
+        : ENTRY_CANDIDATES;
+
+      const entryPoints = scopedCandidates
         .map(candidate => path.join(relativeRoot, candidate).split(path.sep).join("/"))
         .filter(candidate => files.some(entry => entry.path === candidate))
         .map(candidate => ({ path: candidate }));
