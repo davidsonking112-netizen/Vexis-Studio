@@ -1,5 +1,5 @@
 export class Agent {
-  constructor({ model, tools = {}, toolDefinitions = null, contextEngine = null, planningEngine = null, memory = null, maxSteps = 20, onEvent = () => {} }) {
+  constructor({ model, tools = {}, toolDefinitions = null, contextEngine = null, planningEngine = null, memory = null, repositoryIntelligence = null, maxSteps = 20, onEvent = () => {} }) {
     if (!model || typeof model.next !== "function") {
       throw new TypeError("model.next must be a function");
     }
@@ -20,6 +20,8 @@ export class Agent {
     this.planningEngine = planningEngine;
     if (memory && typeof memory.recall !== "function") throw new TypeError("memory must provide recall()");
     this.memory = memory;
+    if (repositoryIntelligence && typeof repositoryIntelligence.inspect !== "function") throw new TypeError("repositoryIntelligence must provide inspect()");
+    this.repositoryIntelligence = repositoryIntelligence;
     this.maxSteps = maxSteps;
     this.onEvent = onEvent;
   }
@@ -27,6 +29,16 @@ export class Agent {
   async getModelResponse(messages, { task, signal, step, onEvent }) {
     let modelMessages = messages;
     const memoryMessages = [];
+    if (this.repositoryIntelligence) {
+      const intelligence = await this.repositoryIntelligence.inspect({ query: task, limit: 40 });
+      if (intelligence.symbols.length || intelligence.dependencies.length) {
+        memoryMessages.push({
+          role: "system",
+          content: ["VEXIS REPOSITORY INTELLIGENCE", "Current indexed symbols and dependency relationships. Treat this as structural evidence and verify against files when necessary.", JSON.stringify(intelligence, null, 2)].join("\n\n")
+        });
+      }
+      onEvent({ type: "repository_intelligence", step, symbols: intelligence.symbols.length, dependencies: intelligence.dependencies.length, truncated: intelligence.truncated });
+    }
     if (this.memory) {
       const recalled = await this.memory.recall({ query: task, limit: 10, max_tokens: 2200 });
       if (recalled.entries.length) {
@@ -167,6 +179,7 @@ export class Agent {
     }
 
     if (this.contextEngine?.invalidate) this.contextEngine.invalidate();
+    if (this.repositoryIntelligence?.invalidate) this.repositoryIntelligence.invalidate();
   }
 
   async run(task, { signal, onEvent = this.onEvent } = {}) {
