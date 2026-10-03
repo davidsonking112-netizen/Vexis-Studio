@@ -189,3 +189,21 @@ test("desktop returns structured errors for malformed JSON", async () => {
     await desktop.stop();
   }
 });
+
+test("desktop converts unexpected handler failures into HTTP 500 responses", async () => {
+  const desktop = createDesktop({
+    agent: { run: async () => ({ output: "unused" }) },
+    registry: {
+      list: () => { throw new Error("registry unavailable"); },
+      discover: () => []
+    }
+  });
+  const address = await desktop.start();
+  try {
+    const response = await fetch(address.url + "api/tools");
+    assert.equal(response.status, 500);
+    assert.equal((await response.json()).error, "registry unavailable");
+  } finally {
+    await desktop.stop();
+  }
+});
