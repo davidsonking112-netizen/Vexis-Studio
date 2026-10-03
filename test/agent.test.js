@@ -220,6 +220,24 @@ test("compactMessages leaves small requests untouched", () => {
   assert.strictEqual(result.messages, messages);
 });
 
+test("compactMessages does not mutate the original message history", () => {
+  const messages = [
+    { role: "system", content: "instructions " + "x".repeat(4000) },
+    { role: "user", content: "task" },
+    { role: "assistant", content: "old response " + "y".repeat(4000) },
+    { role: "tool", name: "old", content: "old result " + "z".repeat(4000) },
+    { role: "assistant", content: "recent response" },
+    { role: "tool", name: "recent", content: "recent result" }
+  ];
+  const original = structuredClone(messages);
+
+  const result = compactMessages(messages, 500);
+
+  assert.notStrictEqual(result.messages, messages);
+  assert.deepEqual(messages, original);
+  assert.ok(result.finalTokens <= 500);
+});
+
 
 test("agent compacts oversized context before the model request", async () => {
   const events = [];

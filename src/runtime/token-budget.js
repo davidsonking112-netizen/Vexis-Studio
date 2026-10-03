@@ -1,6 +1,7 @@
 const DEFAULT_MAX_TOTAL_TOKENS = 160_000;
 const DEFAULT_MAX_INPUT_TOKENS = 32_000;
 const DEFAULT_MAX_OUTPUT_TOKENS = 8_000;
+const CONTEXT_COMPACTED_MARKER = "\n\n[VEXIS CONTEXT COMPACTED]";
 
 function positiveInteger(value, name) {
   if (!Number.isInteger(value) || value < 1) throw new TypeError(name + " must be a positive integer");
@@ -12,7 +13,22 @@ export function estimateBudgetTokens(value) {
   return Math.max(1, Math.ceil(Buffer.byteLength(text, "utf8") / 3.5));
 }
 
-export function compactMessages(messages, maxInputTokens, { recentMessages = 8, minimumMessageTokens = 256 } = {}) {
+function cloneMessage(message) {
+  if (!message || typeof message !== "object") return message;
+  return { ...message };
+}
+
+function messageText(message) {
+  if (typeof message?.content === "string") return message.content;
+  return JSON.stringify(message?.content ?? "");
+}
+
+function truncateUtf8(text, maxBytes) {
+  const buffer = Buffer.from(text, "utf8");
+  return buffer.subarray(0, Math.max(1, maxBytes)).toString("utf8");
+}
+
+export function compactMessages(messages, maxInputTokens, { recentMessages = 2, minimumMessageTokens = 256 } = {}) {
   if (!Array.isArray(messages)) throw new TypeError("messages must be an array");
   positiveInteger(maxInputTokens, "maxInputTokens");
   if (!Number.isInteger(recentMessages) || recentMessages < 1) throw new TypeError("recentMessages must be a positive integer");
@@ -23,92 +39,77 @@ export function compactMessages(messages, maxInputTokens, { recentMessages = 8, 
     return { messages, originalTokens, finalTokens: originalTokens, compacted: false, droppedMessages: 0, truncatedMessages: 0 };
   }
 
-  const latestUserIndex = [...messages].map((message, index) => ({ message, index }))
-    .reverse().find(item => item.message?.role === "user")?.index ?? -1;
-  const firstSystemIndex = messages.findIndex(message => message?.role === "system");
+  const records = messages.map((message, originalIndex) => ({
+    originalIndex,
+    message: cloneMessage(message)
+  }));
+  const latestUserIndex = [...records].reverse().find(record => record.message?.role === "user")?.originalIndex ?? -1;
+  const firstSystemIndex = records.find(record => record.message?.role === "system")?.originalIndex ?? -1;
   const keep = new Set();
 
   if (firstSystemIndex >= 0) keep.add(firstSystemIndex);
   if (latestUserIndex >= 0) keep.add(latestUserIndex);
-
-  for (let index = Math.max(0, messages.length - recentMessages); index < messages.length; index++) {
+  for (let index = Math.max(0, records.length - recentMessages); index < records.length; index += 1) {
     keep.add(index);
   }
 
-  let compactedMessages = messages.filter((_, index) => keep.has(index));
-  let droppedMessages = messages.length - compactedMessages.length;
+  let selected = records.filter(record => keep.has(record.originalIndex));
+  let droppedMessages = records.length - selected.length;
   let truncatedMessages = 0;
-  let finalTokens = estimateBudgetTokens(compactedMessages);
+  let finalTokens = estimateBudgetTokens(selected.map(record => record.message));
 
   while (finalTokens > maxInputTokens) {
-    const candidates = compactedMessages
-      .map((message, index) => ({
+    const removable = selected
+      .filter(record => record.originalIndex !== firstSystemIndex && record.originalIndex !== latestUserIndex)
+      .sort((a, b) => a.originalIndex - b.originalIndex)[0];
+
+    if (removable) {
+      selected = selected.filter(record => record !== removable);
+      droppedMessages += 1;
+      finalTokens = estimateBudgetTokens(selected.map(record => record.message));
+      continue;
+    }
+
+    const candidates = selected
+      .map((record, index) => ({
+        record,
         index,
-        tokens: estimateBudgetTokens(message.content ?? message),
-        role: message?.role
+        tokens: estimateBudgetTokens(record.message?.content ?? record.message)
       }))
       .filter(candidate => candidate.tokens > minimumMessageTokens)
-      .sort((a, b) => b.tokens - a.tokens);
+      .sort((a, b) => b.tokens - a.tokens || a.record.originalIndex - b.record.originalIndex);
 
     if (!candidates.length) break;
 
     const candidate = candidates[0];
-    const message = compactedMessages[candidate.index];
-    const currentText = typeof message.content === "string"
-      ? message.content
-      : JSON.stringify(message.content ?? "");
-    const currentBytes = Buffer.byteLength(currentText, "utf8");
-
-    let targetTokens = Math.max(minimumMessageTokens, Math.floor(candidate.tokens * 0.55));
+    const message = candidate.record.message;
+    const currentText = messageText(message);
     const nonCandidateTokens = estimateBudgetTokens(
-      compactedMessages.filter((_, index) => index !== candidate.index)
+      selected.filter((_, index) => index !== candidate.index).map(record => record.message)
     );
     const requiredTokens = Math.max(1, maxInputTokens - nonCandidateTokens - 1);
-    targetTokens = Math.min(targetTokens, requiredTokens);
+    const targetTokens = Math.min(
+      Math.max(1, Math.min(minimumMessageTokens, candidate.tokens - 1)),
+      requiredTokens
+    );
+    const targetBytes = Math.max(1, Math.floor(targetTokens * 3.5) - Buffer.byteLength(CONTEXT_COMPACTED_MARKER, "utf8"));
+    const truncated = truncateUtf8(currentText, targetBytes);
 
-    if (targetTokens >= candidate.tokens) {
-      const removable = compactedMessages
-        .map((item, index) => ({ item, index }))
-        .filter(({ index, item }) =>
-          index !== latestUserIndex &&
-          item?.role !== "user" &&
-          item?.role !== "system"
-        )
-        .sort((a, b) => a.index - b.index)[0];
-
-      if (removable) {
-        compactedMessages.splice(removable.index, 1);
-        droppedMessages += 1;
-        finalTokens = estimateBudgetTokens(compactedMessages);
-        continue;
-      }
-
-      targetTokens = Math.max(1, requiredTokens);
+    if (truncated === currentText && candidate.record.originalIndex !== firstSystemIndex && candidate.record.originalIndex !== latestUserIndex) {
+      selected.splice(candidate.index, 1);
+      droppedMessages += 1;
+      finalTokens = estimateBudgetTokens(selected.map(record => record.message));
+      continue;
     }
 
-    const targetBytes = Math.max(1, Math.floor(targetTokens * 3.5));
-    let text = currentText.slice(0, Math.min(currentText.length, targetBytes));
-    while (Buffer.byteLength(text, "utf8") > Math.max(1, targetBytes - 32) && text.length > 1) {
-      text = text.slice(0, -1);
-    }
-
-    message.content = text + "\n\n[VEXIS CONTEXT COMPACTED]";
+    message.content = truncated + CONTEXT_COMPACTED_MARKER;
     truncatedMessages += 1;
-    finalTokens = estimateBudgetTokens(compactedMessages);
-
-    if (currentBytes <= Buffer.byteLength(text, "utf8")) {
-      const removable = compactedMessages
-        .map((item, index) => ({ item, index }))
-        .filter(({ item }) => item?.role !== "user")
-        .sort((a, b) => a.index - b.index)[0];
-      if (removable) {
-        compactedMessages.splice(removable.index, 1);
-        droppedMessages += 1;
-        finalTokens = estimateBudgetTokens(compactedMessages);
-      } else {
-        break;
-      }
+    const nextTokens = estimateBudgetTokens(selected.map(record => record.message));
+    if (nextTokens >= finalTokens && candidate.record.originalIndex !== firstSystemIndex && candidate.record.originalIndex !== latestUserIndex) {
+      selected.splice(candidate.index, 1);
+      droppedMessages += 1;
     }
+    finalTokens = estimateBudgetTokens(selected.map(record => record.message));
   }
 
   if (finalTokens > maxInputTokens) {
@@ -120,7 +121,7 @@ export function compactMessages(messages, maxInputTokens, { recentMessages = 8, 
   }
 
   return {
-    messages: compactedMessages,
+    messages: selected.map(record => record.message),
     originalTokens,
     finalTokens,
     compacted: true,
@@ -195,128 +196,6 @@ export class TokenBudget {
     };
   }
 }
-
-export const DEFAULT_TOKEN_BUDGET = {
-  maxTotalTokens: DEFAULT_MAX_TOTAL_TOKENS,
-  maxInputTokens: DEFAULT_MAX_INPUT_TOKENS,
-  maxOutputTokens: DEFAULT_MAX_OUTPUT_TOKENS
-};export function compactMessages(messages, maxInputTokens, { recentMessages = 8, minimumMessageTokens = 256 } = {}) {
-  if (!Array.isArray(messages)) throw new TypeError("messages must be an array");
-  positiveInteger(maxInputTokens, "maxInputTokens");
-  if (!Number.isInteger(recentMessages) || recentMessages < 1) throw new TypeError("recentMessages must be a positive integer");
-  if (!Number.isInteger(minimumMessageTokens) || minimumMessageTokens < 1) throw new TypeError("minimumMessageTokens must be a positive integer");
-
-  const originalTokens = estimateBudgetTokens(messages);
-  if (originalTokens <= maxInputTokens) {
-    return { messages, originalTokens, finalTokens: originalTokens, compacted: false, droppedMessages: 0, truncatedMessages: 0 };
-  }
-
-  const latestUserIndex = [...messages].map((message, index) => ({ message, index }))
-    .reverse().find(item => item.message?.role === "user")?.index ?? -1;
-  const firstSystemIndex = messages.findIndex(message => message?.role === "system");
-  const keep = new Set();
-
-  if (firstSystemIndex >= 0) keep.add(firstSystemIndex);
-  if (latestUserIndex >= 0) keep.add(latestUserIndex);
-
-  for (let index = Math.max(0, messages.length - recentMessages); index < messages.length; index++) {
-    keep.add(index);
-  }
-
-  let compactedMessages = messages.filter((_, index) => keep.has(index));
-  let droppedMessages = messages.length - compactedMessages.length;
-  let truncatedMessages = 0;
-  let finalTokens = estimateBudgetTokens(compactedMessages);
-
-  while (finalTokens > maxInputTokens) {
-    const candidates = compactedMessages
-      .map((message, index) => ({
-        index,
-        tokens: estimateBudgetTokens(message.content ?? message),
-        role: message?.role
-      }))
-      .filter(candidate => candidate.tokens > minimumMessageTokens)
-      .sort((a, b) => b.tokens - a.tokens);
-
-    if (!candidates.length) break;
-
-    const candidate = candidates[0];
-    const message = compactedMessages[candidate.index];
-    const currentText = typeof message.content === "string"
-      ? message.content
-      : JSON.stringify(message.content ?? "");
-    const currentBytes = Buffer.byteLength(currentText, "utf8");
-
-    let targetTokens = Math.max(minimumMessageTokens, Math.floor(candidate.tokens * 0.55));
-    const nonCandidateTokens = estimateBudgetTokens(
-      compactedMessages.filter((_, index) => index !== candidate.index)
-    );
-    const requiredTokens = Math.max(1, maxInputTokens - nonCandidateTokens - 1);
-    targetTokens = Math.min(targetTokens, requiredTokens);
-
-    if (targetTokens >= candidate.tokens) {
-      const removable = compactedMessages
-        .map((item, index) => ({ item, index }))
-        .filter(({ index, item }) =>
-          index !== latestUserIndex &&
-          item?.role !== "user" &&
-          item?.role !== "system"
-        )
-        .sort((a, b) => a.index - b.index)[0];
-
-      if (removable) {
-        compactedMessages.splice(removable.index, 1);
-        droppedMessages += 1;
-        finalTokens = estimateBudgetTokens(compactedMessages);
-        continue;
-      }
-
-      targetTokens = Math.max(1, requiredTokens);
-    }
-
-    const targetBytes = Math.max(1, Math.floor(targetTokens * 3.5));
-    let text = currentText.slice(0, Math.min(currentText.length, targetBytes));
-    while (Buffer.byteLength(text, "utf8") > Math.max(1, targetBytes - 32) && text.length > 1) {
-      text = text.slice(0, -1);
-    }
-
-    message.content = text + "\n\n[VEXIS CONTEXT COMPACTED]";
-    truncatedMessages += 1;
-    finalTokens = estimateBudgetTokens(compactedMessages);
-
-    if (currentBytes <= Buffer.byteLength(text, "utf8")) {
-      const removable = compactedMessages
-        .map((item, index) => ({ item, index }))
-        .filter(({ item }) => item?.role !== "user")
-        .sort((a, b) => a.index - b.index)[0];
-      if (removable) {
-        compactedMessages.splice(removable.index, 1);
-        droppedMessages += 1;
-        finalTokens = estimateBudgetTokens(compactedMessages);
-      } else {
-        break;
-      }
-    }
-  }
-
-  if (finalTokens > maxInputTokens) {
-    const error = new Error("Unable to compact model messages within Vexis input token budget (" + finalTokens + " > " + maxInputTokens + ")");
-    error.code = "VEXIS_INPUT_COMPACTION_FAILED";
-    error.inputTokens = finalTokens;
-    error.maxInputTokens = maxInputTokens;
-    throw error;
-  }
-
-  return {
-    messages: compactedMessages,
-    originalTokens,
-    finalTokens,
-    compacted: true,
-    droppedMessages,
-    truncatedMessages
-  };
-}
-
 
 export const DEFAULT_TOKEN_BUDGET = {
   maxTotalTokens: DEFAULT_MAX_TOTAL_TOKENS,

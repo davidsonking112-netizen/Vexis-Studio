@@ -49,7 +49,11 @@ test("anthropic adapter converts tool calls into the common model contract", asy
     }
   });
   const result = await model.next({
-    messages: [{ role: "user", content: "inspect" }],
+    messages: [
+      { role: "system", content: "Follow the execution plan." },
+      { role: "user", content: "inspect" }
+    ],
+    maxTokens: 1234,
     toolDefinitions: [{ name: "inspect_codebase", description: "inspect", input: { type: "object", properties: { path: { type: "string" } } } }]
   });
   assert.equal(result.type, "tool_call");
@@ -57,6 +61,8 @@ test("anthropic adapter converts tool calls into the common model contract", asy
   assert.equal(result.name, "inspect_codebase");
   assert.deepEqual(result.input, { path: "src" });
   assert.equal(request.url, "https://api.anthropic.com/v1/messages");
+  assert.equal(request.body.system, "Follow the execution plan.");
+  assert.equal(request.body.max_tokens, 1234);
   assert.equal(request.body.tools[0].name, "inspect_codebase");
   assert.equal(request.headers["anthropic-version"], "2023-06-01");
 });
@@ -93,14 +99,21 @@ test("anthropic streaming adapter emits text and tool events", async () => {
     apiKey: "key",
     model: "claude-test",
     fetchImpl: async (_url, options) => {
-      assert.equal(JSON.parse(options.body).stream, true);
+      const request = JSON.parse(options.body);
+      assert.equal(request.stream, true);
+      assert.equal(request.max_tokens, 2345);
+      assert.equal(request.system, "Use the current repository context.");
       return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
     }
   });
 
   const events = [];
   for await (const event of model.nextStream({
-    messages: [{ role: "user", content: "inspect" }],
+    messages: [
+      { role: "system", content: "Use the current repository context." },
+      { role: "user", content: "inspect" }
+    ],
+    maxTokens: 2345,
     toolDefinitions: [{ name: "inspect" }]
   })) events.push(event);
 

@@ -2,6 +2,7 @@ import { normalizeModelEvent, normalizeModelResponse } from "./model.js";
 
 const DEFAULT_BASE_URL = "https://api.anthropic.com";
 const DEFAULT_MODEL = "claude-sonnet-4-5";
+const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
 const API_VERSION = "2023-06-01";
 
 function trimSlash(value) { return String(value).replace(/\/+$/, ""); }
@@ -34,6 +35,7 @@ function sleep(ms, signal) {
 
 function convertMessages(messages) {
   const result = [];
+  const system = [];
   let pendingToolResults = [];
 
   const flushToolResults = () => {
@@ -54,7 +56,10 @@ function convertMessages(messages) {
 
     flushToolResults();
 
-    if (message.role === "user") {
+    if (message.role === "system") {
+      const content = String(message.content ?? "");
+      if (content) system.push(content);
+    } else if (message.role === "user") {
       result.push({ role: "user", content: String(message.content ?? "") });
     } else if (message.role === "assistant") {
       const blocks = [];
@@ -75,7 +80,14 @@ function convertMessages(messages) {
   }
 
   flushToolResults();
-  return { system: [], messages: result };
+  return { system: system.join("\n\n"), messages: result };
+}
+
+function validateMaxTokens(maxTokens) {
+  if (!Number.isInteger(maxTokens) || maxTokens < 1) {
+    throw new TypeError("maxTokens must be a positive integer");
+  }
+  return maxTokens;
 }
 
 function toTools(definitions = []) {
@@ -190,8 +202,9 @@ export class AnthropicModel {
     };
   }
 
-  async next({ messages, toolDefinitions = [], signal }) {
+  async next({ messages, toolDefinitions = [], maxTokens = DEFAULT_MAX_OUTPUT_TOKENS, signal }) {
     if (!Array.isArray(messages)) throw new TypeError("messages must be an array");
+    validateMaxTokens(maxTokens);
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -212,7 +225,7 @@ export class AnthropicModel {
             },
             body: JSON.stringify({
               model: this.model,
-              max_tokens: 4096,
+              max_tokens: maxTokens,
               system: converted.system,
               messages: converted.messages,
               tools: toTools(toolDefinitions)
@@ -247,8 +260,9 @@ export class AnthropicModel {
     }
   }
 
-  async *nextStream({ messages, toolDefinitions = [], signal }) {
+  async *nextStream({ messages, toolDefinitions = [], maxTokens = DEFAULT_MAX_OUTPUT_TOKENS, signal }) {
     if (!Array.isArray(messages)) throw new TypeError("messages must be an array");
+    validateMaxTokens(maxTokens);
 
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       if (signal?.aborted) throw new Error("Model request cancelled");
@@ -270,7 +284,7 @@ export class AnthropicModel {
           },
           body: JSON.stringify({
             model: this.model,
-            max_tokens: 4096,
+            max_tokens: maxTokens,
             system: converted.system,
             messages: converted.messages,
             tools: toTools(toolDefinitions),
