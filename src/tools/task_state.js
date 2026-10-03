@@ -188,6 +188,10 @@ export function createTaskStateTool({
           throw new TypeError("checkpoint requires step_id and summary");
         }
 
+        if (!current.plan.some(step => step.id === String(input.step_id))) {
+          throw new TypeError("checkpoint step_id must reference a plan step");
+        }
+
         const next = {
           ...current,
           status: input.status ?? "in_progress",
