@@ -92,7 +92,7 @@ test("planning engine generates, validates, and persists a rich plan", async () 
     const plan = await engine.create("Implement a feature");
 
     assert.equal(plan.steps.length, 2);
-    assert.equal(request.maxTokens, 4096);
+    assert.equal(request.maxTokens, 6000);
     assert.equal(request.messages.length, 2);
     assert.equal(request.messages[0].role, "system");
     assert.equal(request.messages[1].role, "user");
