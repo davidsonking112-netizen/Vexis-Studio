@@ -364,9 +364,15 @@ form.addEventListener("submit", async event => {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Request failed");
-    addMessage("agent", data.output || "Task completed.");
-    activity.innerHTML = "<strong>Last task</strong><br>Completed successfully.";
-    setStatus("Ready");
+    if (data.status === "cancelled") {
+      addMessage("agent", "Task cancelled.");
+      activity.innerHTML = "<strong>Task cancelled</strong><br>The agent stopped before completing the request.";
+      setStatus("Ready");
+    } else {
+      addMessage("agent", data.output || "Task completed.");
+      activity.innerHTML = "<strong>Last task</strong><br>Completed successfully.";
+      setStatus("Ready");
+    }
   } catch (error) {
     addMessage("error", error.message);
     activity.innerHTML = "<strong>Last task</strong><br>Failed. See the conversation for details.";
@@ -490,14 +496,16 @@ export function createDesktop({
   let taskQueue = Promise.resolve();
   const tasks = new Map();
 
-  const publish = (taskId, event) => {
+  const publish = (taskId, event, { close = false } = {}) => {
     const state = tasks.get(taskId);
     if (!state) return;
     state.events.push(event);
     if (state.events.length > 100) state.events.shift();
     for (const client of state.clients) {
       client.write("data: " + JSON.stringify(event) + "\n\n");
+      if (close) client.end();
     }
+    if (close) state.clients.clear();
   };
 
   const enqueueTask = (taskId, task) => {
@@ -554,15 +562,21 @@ export function createDesktop({
         try {
           const result = await enqueueTask(taskId, body.task.trim());
           state.done = true;
-          publish(taskId, { type: "task_complete", status: result?.status || "completed" });
+          publish(taskId, { type: "task_complete", status: result?.status || "completed" }, { close: true });
           sendJson(response, 200, { id: taskId,
           status: result?.status || "completed",
           output: result?.output || ""
           });
         } catch (error) {
           state.done = true;
-          publish(taskId, { type: "task_error", error: error instanceof Error ? error.message : String(error) });
-          sendJson(response, error.statusCode || 500, { id: taskId, error: error instanceof Error ? error.message : String(error) });
+          if (state.controller.signal.aborted) {
+            publish(taskId, { type: "task_cancelled" }, { close: true });
+            sendJson(response, 200, { id: taskId, status: "cancelled", output: "" });
+          } else {
+            const message = error instanceof Error ? error.message : String(error);
+            publish(taskId, { type: "task_error", error: message }, { close: true });
+            sendJson(response, error.statusCode || 500, { id: taskId, error: message });
+          }
         }
       } catch (error) {
         sendJson(response, error.statusCode || 500, { error: error instanceof Error ? error.message : String(error) });
