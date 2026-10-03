@@ -374,6 +374,33 @@ The Agent emits a context_update event before each model turn. After tool execut
 Stage 14 is considered complete only when context selection, budgeting, compression, agent integration, and automated verification remain coherent together.
 
 
+## Stage 16 agent memory
+
+Stage 16 adds a durable, bounded memory layer for information that should survive individual model turns and task restarts without turning the agent's history into an unbounded transcript.
+
+The memory engine provides:
+
+- workspace-local persistence at `.vexis/agent-memory.json`
+- typed memories for facts, decisions, failures, successes, capabilities, constraints, and reusable patterns
+- provenance fields for task/plan/step/source attribution
+- confidence values and timestamps
+- deterministic lexical retrieval with task-aware, type-aware, confidence, and recency signals
+- hard entry, byte, recall-count, and recall-token bounds
+- deterministic duplicate detection and merging
+- explicit forgetting and clearing
+- atomic writes and workspace-bound path validation
+- a stable agent-memory tool contract for explicit model-directed memory operations
+
+### Memory contract
+
+Memory is deliberately **structured evidence**, not an opaque conversation dump. The Agent retrieves a small bounded set before each model turn and labels it as durable memory; current repository state and verification remain authoritative when they disagree.
+
+High-value failures are recorded automatically when tools fail, while successful task completion is recorded as a low-confidence historical signal. Models can also explicitly store decisions, constraints, capabilities, and patterns through the `agent_memory` tool.
+
+The memory subsystem is provider-independent and does not persist model credentials or raw provider transcripts.
+
+Stage 16 is considered complete only when persistence, retrieval, deduplication, bounds, agent integration, explicit tool access, and automated verification remain coherent together.
+
 ## Stage 15 planning engine
 
 Stage 15 introduces a first-class planning subsystem designed for precision rather than a cosmetic list of model-generated steps.
