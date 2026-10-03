@@ -119,8 +119,9 @@ export function createDesktop({
   let taskQueue = Promise.resolve();
 
   const enqueueTask = task => {
-    taskQueue = taskQueue.then(() => agent.run(task));
-    return taskQueue;
+    const run = taskQueue.catch(() => undefined).then(() => agent.run(task));
+    taskQueue = run.catch(() => undefined);
+    return run;
   };
 
   const requestHandler = async (request, response) => {
