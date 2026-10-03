@@ -420,3 +420,4 @@ SWE-agent research emphasizes a tight agent/computer interface, bounded context,
 Vexis adopts those principles but keeps the implementation deliberately native to its architecture: deterministic validation and state are Vexis-owned; the model proposes the plan; the runtime verifies the plan before execution.
 
 Stage 15 is considered complete only when planning, dependency validation, persistence, agent preflight, verification gates, and automated tests remain coherent together.
+
