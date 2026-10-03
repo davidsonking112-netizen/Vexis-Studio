@@ -93,6 +93,10 @@ test("planning engine generates, validates, and persists a rich plan", async () 
 
     assert.equal(plan.steps.length, 2);
     assert.equal(request.maxTokens, 4096);
+    assert.equal(request.messages.length, 2);
+    assert.equal(request.messages[0].role, "system");
+    assert.equal(request.messages[1].role, "user");
+    assert.match(request.messages[1].content, /REPOSITORY CONTEXT:/);
     assert.equal(plan.steps[1].dependencies[0], "inspect");
 
     const persisted = await taskState.execute({ action: "read" });
