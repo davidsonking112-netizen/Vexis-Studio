@@ -321,7 +321,11 @@ export class ContextEngine {
 
     const scored = candidates
       .map(candidate => ({ ...candidate, score: scoreCandidate(candidate, query) }))
-      .sort((a, b) => b.score - a.score || String(a.id).localeCompare(String(b.id)));
+      .sort((a, b) =>
+        Number(Boolean(b.explicit)) - Number(Boolean(a.explicit)) ||
+        b.score - a.score ||
+        String(a.id).localeCompare(String(b.id))
+      );
 
     const selected = [];
     let usedTokens = 0;
