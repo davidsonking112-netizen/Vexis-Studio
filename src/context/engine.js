@@ -336,9 +336,20 @@ export class ContextEngine {
       const remaining = maxTokens - usedTokens - separatorCost;
       if (remaining < 16) break;
 
-      const compressed = compressText(candidate.content, remaining);
-      const rendered = formatCandidate(candidate, compressed.text);
-      const tokens = estimateTokens(rendered);
+      const label = candidate.path
+        ? "### " + candidate.type + ": " + candidate.path + "\n"
+        : "### " + candidate.type + "\n";
+      let contentBudget = Math.max(1, remaining - estimateTokens(label) - 2);
+      let compressed = compressText(candidate.content, contentBudget);
+      let rendered = formatCandidate(candidate, compressed.text);
+      let tokens = estimateTokens(rendered);
+
+      if (tokens > remaining) {
+        contentBudget = Math.max(1, contentBudget - (tokens - remaining) - 2);
+        compressed = compressText(candidate.content, contentBudget);
+        rendered = formatCandidate(candidate, compressed.text);
+        tokens = estimateTokens(rendered);
+      }
 
       if (tokens > remaining) continue;
 
