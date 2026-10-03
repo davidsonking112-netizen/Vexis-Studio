@@ -161,3 +161,71 @@ test("streaming transport requests SSE and emits text deltas", async () => {
   assert.equal(events.filter(event => event.type === "text_delta").map(event => event.delta).join(""), "Hello");
   assert.equal(events.at(-1).type, "complete");
 });
+
+
+test("openai-compatible runtime preserves multiple tool calls", async () => {
+  const model = new OpenAICompatibleModel({
+    apiKey: "test-key",
+    baseUrl: "https://example.test/v1",
+    model: "test-model",
+    fetchImpl: async () => response({
+      choices: [{
+        message: {
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { id: "a", type: "function", function: { name: "one", arguments: '{"x":1}' } },
+            { id: "b", type: "function", function: { name: "two", arguments: '{"y":2}' } }
+          ]
+        }
+      }]
+    })
+  });
+
+  const result = await model.next({
+    messages: [{ role: "user", content: "run both" }],
+    toolDefinitions: [{ name: "one" }, { name: "two" }]
+  });
+
+  assert.equal(result.type, "tool_calls");
+  assert.deepEqual(result.calls.map(call => call.id), ["a", "b"]);
+  assert.deepEqual(result.calls.map(call => call.input), [{ x: 1 }, { y: 2 }]);
+});
+
+test("streaming transport handles fragmented SSE frames and fragmented tool arguments", async () => {
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      const frames = [
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"inspect","arguments":"{\\"path\\":\\"sr"}}]}}]}\n',
+        '\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"c\\"}"}}]},"finish_reason":"tool_calls"}]}\n\n',
+        'data: [DONE]\n\n'
+      ];
+      for (const frame of frames) controller.enqueue(encoder.encode(frame));
+      controller.close();
+    }
+  });
+
+  const model = new OpenAICompatibleModel({
+    apiKey: "test-key",
+    baseUrl: "https://example.test/v1",
+    model: "test-model",
+    fetchImpl: async () => new Response(body, {
+      status: 200,
+      headers: { "content-type": "text/event-stream" }
+    })
+  });
+
+  const events = [];
+  for await (const event of model.nextStream({
+    messages: [{ role: "user", content: "inspect" }],
+    toolDefinitions: [{ name: "inspect" }]
+  })) events.push(event);
+
+  const complete = events.at(-1);
+  assert.equal(complete.type, "complete");
+  assert.equal(complete.response.type, "tool_calls");
+  assert.equal(complete.response.calls[0].name, "inspect");
+  assert.deepEqual(complete.response.calls[0].input, { path: "src" });
+});
