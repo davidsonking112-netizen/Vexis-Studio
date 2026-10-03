@@ -291,3 +291,39 @@ test("agent run supports per-run events and abort signals", async () => {
   assert.equal(result.output, "done");
   assert.deepEqual(events, ["model_start", "model_response"]);
 });
+
+
+test("desktop editor lists, opens, and hash-guards saves", async () => {
+  const filesystem = {
+    list_files: { execute: async () => ({ root: ".", entries: [{ path: "src/demo.js", type: "file" }] }) },
+    read_file: { execute: async ({ path }) => ({ path, bytes: 3, content: "abc" }) }
+  };
+  const edit = { execute: async input => ({ path: input.path, changed: true, after_sha256: "b".repeat(64) }) };
+  const desktop = createDesktop({
+    agent: { run: async () => ({ output: "unused" }) },
+    registry: registry(),
+    filesystem,
+    edit
+  });
+  const address = await desktop.start();
+  try {
+    const files = await json(address.url + "api/editor/files");
+    assert.equal(files.response.status, 200);
+    assert.equal(files.body.entries[0].path, "src/demo.js");
+
+    const opened = await json(address.url + "api/editor/file?path=src%2Fdemo.js");
+    assert.equal(opened.response.status, 200);
+    assert.equal(opened.body.content, "abc");
+    assert.equal(opened.body.sha256.length, 64);
+
+    const stale = await json(address.url + "api/editor/file", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: "src/demo.js", expected_sha256: "0".repeat(64), content: "abcd" })
+    });
+    assert.equal(stale.response.status, 409);
+    assert.match(stale.body.error, /changed since it was opened/i);
+  } finally {
+    await desktop.stop();
+  }
+});
