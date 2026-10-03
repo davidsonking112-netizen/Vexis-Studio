@@ -4,10 +4,10 @@ import { AnthropicModel } from "./anthropic.js";
 
 export const PROVIDER_CAPABILITIES = Object.freeze({
   "openai": Object.freeze({ toolCalling: true, structuredOutput: true, vision: true, streaming: true, parallelToolCalls: true }),
-  "anthropic": Object.freeze({ toolCalling: true, structuredOutput: false, vision: true, streaming: false, parallelToolCalls: true }),
+  "anthropic": Object.freeze({ toolCalling: true, structuredOutput: false, vision: true, streaming: true, parallelToolCalls: true }),
   "openai-compatible": Object.freeze({ toolCalling: true, structuredOutput: false, vision: false, streaming: false, parallelToolCalls: true }),
-  "qwen": Object.freeze({ toolCalling: true, structuredOutput: true, vision: true, streaming: false, parallelToolCalls: true }),
-  "local": Object.freeze({ toolCalling: true, structuredOutput: false, vision: false, streaming: false, parallelToolCalls: true })
+  "qwen": Object.freeze({ toolCalling: true, structuredOutput: true, vision: true, streaming: true, parallelToolCalls: true }),
+  "local": Object.freeze({ toolCalling: true, structuredOutput: false, vision: false, streaming: true, parallelToolCalls: true })
 });
 
 const DEFAULTS = Object.freeze({
@@ -44,7 +44,6 @@ export function createProviderModel(config = {}) {
   const normalized = normalizeProviderConfig(config);
   const options = { ...normalized };
   delete options.provider;
-  delete options.capabilities;
   if (config.fetchImpl) options.fetchImpl = config.fetchImpl;
 
   let model;
@@ -53,7 +52,8 @@ export function createProviderModel(config = {}) {
   } else {
     model = new OpenAICompatibleModel({
       ...options,
-      provider: normalized.provider
+      provider: normalized.provider,
+      capabilities: normalized.capabilities
     });
   }
 
