@@ -45,7 +45,7 @@ export function createCodebaseTool({
         throw new Error("Path escapes the workspace");
       }
 
-      const relativeRoot = path.relative(root, directory) || ".";
+      const relativeRoot = path.relative(root, directory);
       await fs.stat(directory);
 
       const limit = Math.min(
