@@ -10,6 +10,7 @@ import { createTaskStateTool } from "./tools/task_state.js";
 import { createContextEngine } from "./context/engine.js";
 import { createPlanningEngine } from "./planning/engine.js";
 import { createAgentMemory } from "./memory/engine.js";
+import { createRepositoryIntelligence } from "./repository/engine.js";
 import { createToolRegistry } from "./tools/registry.js";
 
 export function createRuntime({
@@ -21,6 +22,7 @@ export function createRuntime({
   contextConfig = {},
   planningConfig = {},
   memoryConfig = {},
+  repositoryConfig = {},
   enablePlanning = true,
   enableMemory = true
 } = {}) {
@@ -42,6 +44,7 @@ export function createRuntime({
     ? createPlanningEngine({ model: selectedModel, contextEngine, taskState, ...planningConfig })
     : null;
   const memory = enableMemory ? createAgentMemory({ workspace, ...memoryConfig }) : null;
+  const repositoryIntelligence = createRepositoryIntelligence({ workspace, filesystem, ...repositoryConfig });
   const registry = createToolRegistry({
     ...filesystem,
     run_command: command,
@@ -49,7 +52,8 @@ export function createRuntime({
     edit_file: edit,
     run_tests: testTool,
     task_state: taskState,
-    ...(memory ? { agent_memory: memory } : {})
+    ...(memory ? { agent_memory: memory } : {}),
+    repository_intelligence: repositoryIntelligence
   });
   const tools = registry.toAgentTools();
 
@@ -74,6 +78,7 @@ export function createRuntime({
     contextEngine,
     planningEngine,
     memory,
+    repositoryIntelligence,
     workspace
   };
 }
