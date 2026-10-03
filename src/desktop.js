@@ -455,7 +455,15 @@ export function createDesktop({
   async function start() {
     if (server?.listening) return address();
     server = createServer((request, response) => {
-      void requestHandler(request, response);
+      void requestHandler(request, response).catch(error => {
+        if (response.headersSent) {
+          response.destroy();
+          return;
+        }
+        sendJson(response, error?.statusCode || 500, {
+          error: error instanceof Error ? error.message : String(error)
+        });
+      });
     });
     await new Promise((resolve, reject) => {
       server.once("error", reject);
