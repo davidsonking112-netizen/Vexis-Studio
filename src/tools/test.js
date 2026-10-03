@@ -12,7 +12,6 @@ function normalizePackageManager(value) {
 export function createTestTool({
   workspace,
   command,
-  maxOutputBytes = 256 * 1024,
   timeoutMs = 120_000
 }) {
   if (!workspace) throw new TypeError("workspace is required");
