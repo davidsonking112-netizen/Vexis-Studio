@@ -363,3 +363,46 @@ test("desktop editor lists, opens, and hash-guards saves", async () => {
     await desktop.stop();
   }
 });
+
+
+test("desktop exposes bounded editor intelligence for open buffers", async () => {
+  const desktop = createDesktop({
+    agent: { run: async () => ({ output: "unused" }) },
+    registry: registry()
+  });
+  const address = await desktop.start();
+  try {
+    const result = await json(address.url + "api/editor/intelligence", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        path: "src/example.js",
+        content: "const answer = 42;\nfunction greet() { return answer; }\n"
+      })
+    });
+    assert.equal(result.response.status, 200);
+    assert.equal(result.body.language, "javascript");
+    assert.deepEqual(result.body.symbols.map(symbol => symbol.name), ["answer", "greet"]);
+    assert.equal(result.body.diagnostics.filter(d => d.severity === "error").length, 0);
+  } finally {
+    await desktop.stop();
+  }
+});
+
+test("desktop rejects oversized editor intelligence requests", async () => {
+  const desktop = createDesktop({
+    agent: { run: async () => ({ output: "unused" }) },
+    registry: registry()
+  });
+  const address = await desktop.start();
+  try {
+    const response = await fetch(address.url + "api/editor/intelligence", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: "large.js", content: "x".repeat(257 * 1024) })
+    });
+    assert.equal(response.status, 413);
+  } finally {
+    await desktop.stop();
+  }
+});
