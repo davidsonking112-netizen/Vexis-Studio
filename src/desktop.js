@@ -550,6 +550,9 @@ export function createDesktop({
           publish(taskId, { type: "task_error", error: error instanceof Error ? error.message : String(error) });
           sendJson(response, error.statusCode || 500, { id: taskId, error: error instanceof Error ? error.message : String(error) });
         }
+      } catch (error) {
+        sendJson(response, error.statusCode || 500, { error: error instanceof Error ? error.message : String(error) });
+      }
       return;
     }
 
