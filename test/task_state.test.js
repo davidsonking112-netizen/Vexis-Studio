@@ -92,13 +92,21 @@ test("rejects invalid checkpoints and unsafe state paths", async () => {
 });
 
 
-test("rejects state paths redirected outside the workspace", async () => {
+test("rejects state paths redirected outside the workspace", async t => {
   const workspace = await createWorkspace();
   const outside = await createWorkspace();
 
   try {
     await fs.mkdir(path.join(workspace, ".vexis"));
-    await fs.symlink(outside, path.join(workspace, ".vexis", "state"));
+    try {
+      await fs.symlink(outside, path.join(workspace, ".vexis", "state"));
+    } catch (error) {
+      if (error?.code === "EPERM" || error?.code === "EACCES") {
+        t.skip("Windows symlink creation requires the required OS privilege");
+        return;
+      }
+      throw error;
+    }
 
     const tool = createTaskStateTool({
       workspace,
