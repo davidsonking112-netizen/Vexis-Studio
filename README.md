@@ -34,7 +34,7 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 4. **Codebase understanding** — bounded structural project inspection and context selection. **Implemented**
 5. **Editing loop** — propose/apply changes and verify them with hash-guarded exact replacements. **Implemented**
 6. **Test/debug loop** — run tests, inspect failures, repair, repeat. **Implemented**
-7. **Persistent task state** — plans, checkpoints, and resumable work.
+7. **Persistent task state** — plans, checkpoints, and resumable work. **Implemented**
 8. **Tool/skill system** — extensible capabilities and tool discovery.
 9. **Interactive CLI** — polished terminal experience.
 10. **Editor integration** — IDE/editor workflow.
@@ -97,3 +97,17 @@ Stage 6 adds a structured verification primitive:
 - returns concise diagnostics so the agent can inspect a failure and decide whether to edit and retest
 
 The repair/retest behavior is intentionally model-driven: the existing agent kernel already supports repeated tool calls, while this stage supplies a deterministic verification observation. Broader test discovery for Python, Rust, Go, and other ecosystems will be added as separate capabilities rather than hidden inside one oversized runner.
+
+
+## Persistent task state boundary
+
+Stage 7 adds a bounded workspace-local task state primitive:
+
+- persists a versioned task plan to `.vexis/task-state.json`
+- supports initialization, updates, reads, and resumable checkpoints
+- validates task and plan status values and checkpoint step references
+- writes state atomically
+- enforces a workspace boundary and state-size limit
+- exposes the primitive to the agent as `task_state`
+
+The state layer is deliberately independent from model/provider logic so later stages can build richer planning and orchestration on top of a stable persistence contract.
