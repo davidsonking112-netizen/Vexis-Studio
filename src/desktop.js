@@ -442,7 +442,7 @@ function renderEditorIntelligence(result) {
   const activityText=result.diagnostics.length ? result.diagnostics.slice(0,3).map(d=>d.severity.toUpperCase()+" · line "+d.line+" · "+d.message).join("<br>") : "<strong>Editor intelligence</strong><br>No structural issues detected.";
   activity.innerHTML=activityText;
 }
-async document.getElementById("editor-diagnostics").addEventListener("change", event => { const diagnostic=editorCurrent?.intelligence?.diagnostics?.[Number(event.target.value)]; if(!diagnostic) return; const code=document.getElementById("editor-code"); const lines=code.value.split("\n"); let offset=0; for(let i=0;i<diagnostic.line-1;i++) offset+=lines[i].length+1; offset+=Math.max(0,diagnostic.column-1); code.focus(); code.setSelectionRange(offset,Math.min(code.value.length,offset+1)); code.scrollTop=Math.max(0,(diagnostic.line-2)*20); updateEditorLocation(); });
+document.getElementById("editor-diagnostics").addEventListener("change", event => { const diagnostic=editorCurrent?.intelligence?.diagnostics?.[Number(event.target.value)]; if(!diagnostic) return; const code=document.getElementById("editor-code"); const lines=code.value.split("\n"); let offset=0; for(let i=0;i<diagnostic.line-1;i++) offset+=lines[i].length+1; offset+=Math.max(0,diagnostic.column-1); code.focus(); code.setSelectionRange(offset,Math.min(code.value.length,offset+1)); code.scrollTop=Math.max(0,(diagnostic.line-2)*20); updateEditorLocation(); });
 function analyzeEditorCurrent() {
   if(!editorCurrent) return;
   const requestId=++editorIntelligenceRequest;
