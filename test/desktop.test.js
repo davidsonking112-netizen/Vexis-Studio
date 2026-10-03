@@ -17,7 +17,7 @@ async function json(url, options) {
 test("desktop serves a local UI and tool endpoints", async () => {
   const desktop = createDesktop({
     agent: { run: async task => ({ status: "completed", output: `completed: ${task}` }) },
-    registry
+    registry()
   });
   const address = await desktop.start();
   try {
@@ -49,7 +49,7 @@ test("desktop sends tasks through the shared agent", async () => {
         return { status: "completed", output: "done" };
       }
     },
-    registry
+    registry()
   });
   const address = await desktop.start();
   try {
@@ -69,7 +69,7 @@ test("desktop sends tasks through the shared agent", async () => {
 test("desktop rejects invalid and oversized task requests", async () => {
   const desktop = createDesktop({
     agent: { run: async () => ({ output: "unused" }) },
-    registry
+    registry()
   });
   const address = await desktop.start();
   try {
@@ -103,7 +103,7 @@ test("desktop serializes concurrent task execution", async () => {
         return { output: task };
       }
     },
-    registry
+    registry()
   });
   const address = await desktop.start();
   try {
@@ -130,7 +130,7 @@ test("desktop continues accepting tasks after an agent failure", async () => {
         return { output: task };
       }
     },
-    registry
+    registry()
   });
   const address = await desktop.start();
   try {
@@ -158,7 +158,7 @@ test("desktop continues accepting tasks after an agent failure", async () => {
 test("desktop exposes a health endpoint and security headers", async () => {
   const desktop = createDesktop({
     agent: { run: async () => ({ output: "unused" }) },
-    registry
+    registry()
   });
   const address = await desktop.start();
   try {
@@ -177,7 +177,7 @@ test("desktop exposes a health endpoint and security headers", async () => {
 test("desktop returns structured errors for malformed JSON", async () => {
   const desktop = createDesktop({
     agent: { run: async () => ({ output: "unused" }) },
-    registry
+    registry()
   });
   const address = await desktop.start();
   try {
@@ -215,7 +215,7 @@ test("desktop converts unexpected handler failures into HTTP 500 responses", asy
 test("desktop rejects unsupported HTTP methods", async () => {
   const desktop = createDesktop({
     agent: { run: async () => ({ output: "unused" }) },
-    registry
+    registry()
   });
   const address = await desktop.start();
   try {
