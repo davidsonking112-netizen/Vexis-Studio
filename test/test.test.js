@@ -60,7 +60,7 @@ test("reports a failing test command without throwing", async () => {
     const result = await tool.execute();
 
     assert.equal(result.status, "failed");
-    assert.equal(result.exit_code, 2);
+    // npm propagates lifecycle failures as exit code 1 on Windows, while\n    // Unix npm versions preserve the script exit code in this fixture.\n    const expectedExitCode = process.platform === "win32" ? 1 : 2;\n    assert.equal(result.exit_code, expectedExitCode);
     assert.match(result.stderr, /failure detail/);
     assert.equal(result.diagnostics.length, 2);
   } finally {
