@@ -164,13 +164,15 @@ The second interface layer adds a dependency-free terminal workspace:
 
 The TUI uses Node's keypress events and raw TTY mode rather than introducing a UI framework dependency. Node documents that keypress events on a TTY require raw mode, and TTY streams expose resize events for responsive rendering. citeturn0search0turn0search1
 
-The Desktop sector will reuse this same runtime and keep desktop-specific concerns outside the agent kernel.\n\nThe Desktop sector now provides a dependency-free local application shell:
+The Desktop sector will reuse this same runtime and keep desktop-specific concerns outside the agent kernel.\n\nThe Desktop sector is a dependency-free local application shell:
 
-- serves a browser-based Vexis workspace on loopback only
+- serves a polished browser-based coding workspace on loopback only
 - reuses the same `createRuntime()` agent, registry, and tool contracts
-- exposes task execution plus tool/discovery APIs without exposing filesystem APIs directly over HTTP
+- provides a three-panel workspace with agent conversation, workspace context, tools, activity, and shortcuts
+- includes responsive mobile/tablet layouts, task suggestions, keyboard shortcuts, loading/error states, and safe DOM rendering
+- exposes task execution, tool listing, discovery, and health APIs without exposing filesystem APIs directly over HTTP
 - serializes task execution so concurrent UI requests cannot run the agent simultaneously
-- bounds request bodies and returns structured HTTP errors
-- includes a minimal desktop entrypoint and `vexis-desktop` executable
+- bounds request bodies and hardens HTML/JSON responses with browser security headers
+- includes a `vexis-desktop` executable
 
-This is intentionally a desktop **shell**, not an OS-level sandbox or security boundary. The browser UI is local to the machine; stronger permissions and isolation remain part of Stage 12.
+This is intentionally a **desktop shell**, not a native Electron-style application and not an OS-level sandbox. The browser UI is local to the machine; stronger permissions and isolation remain part of Stage 12.
