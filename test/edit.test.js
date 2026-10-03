@@ -94,7 +94,7 @@ test("requires exactly one replacement by default", async () => {
         old_text: "x();",
         new_text: "y();"
       }),
-      /expected exactly one match/
+      /expected exactly 1 match/
     );
 
     assert.equal(await fs.readFile(file, "utf8"), current);
