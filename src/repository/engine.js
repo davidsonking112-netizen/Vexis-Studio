@@ -87,14 +87,15 @@ export class RepositoryIntelligence {
     const fileSet = new Set(files);
     const symbols=[], dependencies=[], reverse={};
     for (const file of files) {
-      if (symbols.length >= this.maxSymbols) break;
       try {
         const result=await this.filesystem.read_file.execute({path:file});
         const content=String(result.content||"");
         if (Buffer.byteLength(content,"utf8") > this.maxFileBytes) continue;
-        for (const symbol of parseSymbols(content,file)) {
-          if (symbols.length >= this.maxSymbols) break;
-          symbols.push(symbol);
+        if (symbols.length < this.maxSymbols) {
+          for (const symbol of parseSymbols(content,file)) {
+            if (symbols.length >= this.maxSymbols) break;
+            symbols.push(symbol);
+          }
         }
         for (const item of parseImports(content,file)) {
           const target=resolveImport(item.source,file,fileSet);
