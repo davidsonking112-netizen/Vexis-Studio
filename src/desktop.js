@@ -173,6 +173,22 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .editor-status span { color:#697287; font-size:9px; }
 .editor-save { border:1px solid rgba(174,160,255,.35); background:rgba(139,124,255,.12); color:#d8d2ff; border-radius:8px; padding:6px 11px; font-size:9px; cursor:pointer; }
 .editor-save:hover { background:rgba(139,124,255,.2); }
+.editor-preview { border:1px solid var(--line); background:rgba(255,255,255,.025); color:#aeb6c8; border-radius:8px; padding:6px 10px; font-size:9px; cursor:pointer; }
+.editor-preview:hover { background:rgba(255,255,255,.06); color:var(--text); }
+.diff-backdrop { position:absolute; inset:0; z-index:8; display:grid; place-items:center; padding:28px; background:rgba(2,3,7,.72); backdrop-filter:blur(10px); }
+.diff-backdrop[hidden] { display:none; }
+.diff-dialog { width:min(980px,100%); max-height:min(82vh,760px); display:grid; grid-template-rows:auto minmax(0,1fr) auto; overflow:hidden; border:1px solid var(--line-strong); border-radius:16px; background:#0c0f17; box-shadow:var(--shadow); }
+.diff-head,.diff-foot { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-bottom:1px solid var(--line); }
+.diff-foot { border-top:1px solid var(--line); border-bottom:0; }
+.diff-head strong { font-size:11px; }
+.diff-head span,.diff-foot span { color:#737d91; font-size:9px; }
+.diff-body { overflow:auto; padding:12px 0; }
+.diff-line { display:block; padding:0 14px; min-height:20px; white-space:pre-wrap; overflow-wrap:anywhere; font:11px/1.8 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+.diff-line.add { background:rgba(55,190,125,.11); color:#a9e8c8; }
+.diff-line.remove { background:rgba(255,91,116,.11); color:#ffb3be; }
+.diff-line.context { color:#aab2c2; }
+.diff-line.meta { color:#858fff; background:rgba(139,124,255,.07); }
+.diff-empty { padding:40px; text-align:center; color:#778195; font-size:11px; }
 @media (max-width:700px) { .editor-shell { grid-template-columns:145px minmax(0,1fr); } .editor-code { padding:12px; font-size:11px; } }
 .rail h2 { font-size:12px; margin:3px 7px 13px; letter-spacing:-.02em; }
 .rail-subtitle { margin:-7px 7px 15px; color:#626b7d; font-size:9px; }
@@ -247,8 +263,15 @@ kbd { border:1px solid var(--line-strong); background:var(--panel-3); color:var(
       <section id="messages" class="messages" hidden></section>
     <section id="editor-view" class="editor-shell" hidden>
       <div class="editor-files"><div class="editor-files-head"><strong>Files</strong><span id="file-count"></span></div><div id="file-list"></div></div>
-      <div class="editor-pane"><div class="editor-tabs" id="editor-tabs"></div><div class="editor-tab-meta"><span id="editor-path">Select a file</span><span id="editor-hash"></span></div><textarea id="editor-code" class="editor-code" spellcheck="false" disabled placeholder="Select a workspace file to begin editing…"></textarea><div class="editor-status"><span id="editor-message">Safe editor · hash guarded saves</span><div style="display:flex;gap:7px"><button id="editor-save-all" class="editor-save" type="button" disabled>Save all</button><button id="editor-save" class="editor-save" type="button" disabled>Save changes</button></div></div></div>
+      <div class="editor-pane"><div class="editor-tabs" id="editor-tabs"></div><div class="editor-tab-meta"><span id="editor-path">Select a file</span><span id="editor-hash"></span></div><textarea id="editor-code" class="editor-code" spellcheck="false" disabled placeholder="Select a workspace file to begin editing…"></textarea><div class="editor-status"><span id="editor-message">Safe editor · hash guarded saves</span><div style="display:flex;gap:7px"><button id="editor-preview" class="editor-preview" type="button" disabled>Preview</button><button id="editor-save-all" class="editor-save" type="button" disabled>Save all</button><button id="editor-save" class="editor-save" type="button" disabled>Save changes</button></div></div></div>
     </section>
+    <div id="diff-backdrop" class="diff-backdrop" hidden>
+      <section class="diff-dialog" role="dialog" aria-modal="true" aria-labelledby="diff-title">
+        <div class="diff-head"><div><strong id="diff-title">Changes</strong><span id="diff-summary"></span></div><button id="diff-close" class="editor-preview" type="button">Close</button></div>
+        <div id="diff-body" class="diff-body"></div>
+        <div class="diff-foot"><span>Review the pending buffer before the hash-guarded save.</span><button id="diff-save" class="editor-save" type="button">Save changes</button></div>
+      </section>
+    </div>
 
     <div class="composer-wrap">
       <form id="task-form" class="composer">
@@ -401,6 +424,7 @@ function updateEditorChrome() {
   }
   document.querySelectorAll(".file-item").forEach(item=>{const open=editorOpenFiles.some(f=>f.path===item.dataset.path);item.classList.toggle("active",open&&editorCurrent?.path===item.dataset.path);item.classList.toggle("open",open);});
   document.getElementById("editor-save").disabled=!editorCurrent||!editorIsDirty(editorCurrent);
+  document.getElementById("editor-preview").disabled=!editorCurrent||!editorIsDirty(editorCurrent);
   document.getElementById("editor-save-all").disabled=!editorOpenFiles.some(editorIsDirty);
 }
 async function loadEditorFiles() {
@@ -427,6 +451,32 @@ function closeEditorFile(file) {
   const index=editorOpenFiles.indexOf(file); if(index>=0) editorOpenFiles.splice(index,1);
   if(editorCurrent===file){editorCurrent=editorOpenFiles[index]||editorOpenFiles[index-1]||null;if(editorCurrent)selectEditorFile(editorCurrent);else{document.getElementById("editor-path").textContent="Select a file";document.getElementById("editor-hash").textContent="";const code=document.getElementById("editor-code");code.value="";code.disabled=true;document.getElementById("editor-message").textContent="Safe editor · hash guarded saves";updateEditorChrome();}}else updateEditorChrome();
 }
+function buildEditorDiff(before, after) {
+  const oldLines=before.split("\n"), newLines=after.split("\n");
+  const max=1200;
+  if(oldLines.length>max||newLines.length>max) return {lines:[{type:"meta",text:"Diff preview limited to files with 1,200 lines or fewer."}],added:0,removed:0,limited:true};
+  const rows=oldLines.length+1, cols=newLines.length+1;
+  const matrix=Array.from({length:rows},()=>new Uint16Array(cols));
+  for(let i=oldLines.length-1;i>=0;i--) for(let j=newLines.length-1;j>=0;j--) matrix[i][j]=oldLines[i]===newLines[j]?matrix[i+1][j+1]+1:Math.max(matrix[i+1][j],matrix[i][j+1]);
+  const lines=[]; let i=0,j=0,added=0,removed=0;
+  while(i<oldLines.length||j<newLines.length){
+    if(i<oldLines.length&&j<newLines.length&&oldLines[i]===newLines[j]){lines.push({type:"context",text:"  "+oldLines[i]});i++;j++;continue;}
+    if(j<newLines.length&&(i===oldLines.length||matrix[i][j+1]>=matrix[i+1][j])){lines.push({type:"add",text:"+ "+newLines[j++]});added++;continue;}
+    lines.push({type:"remove",text:"- "+oldLines[i++]});removed++;
+  }
+  return {lines,added,removed,limited:false};
+}
+function showEditorDiff() {
+  if(!editorCurrent||!editorIsDirty(editorCurrent)) { document.getElementById("editor-message").textContent="No changes to preview."; return; }
+  const diff=buildEditorDiff(editorCurrent.original,editorCurrent.content);
+  const body=document.getElementById("diff-body"); body.replaceChildren();
+  if(!diff.lines.length){const empty=document.createElement("div");empty.className="diff-empty";empty.textContent="No changes.";body.appendChild(empty);}
+  else for(const line of diff.lines){const row=document.createElement("div");row.className="diff-line "+line.type;row.textContent=line.text;body.appendChild(row);}
+  document.getElementById("diff-title").textContent="Changes · "+editorCurrent.path;
+  document.getElementById("diff-summary").textContent=diff.limited?" · preview limited":" · +"+diff.added+" / -"+diff.removed;
+  document.getElementById("diff-backdrop").hidden=false;
+}
+function closeEditorDiff(){document.getElementById("diff-backdrop").hidden=true;}
 async function saveOneEditorFile(file) {
   if(!file||!editorIsDirty(file)) return true;
   const response=await fetch("/api/editor/file",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({path:file.path,expected_sha256:file.sha256,content:file.content})});
@@ -585,8 +635,13 @@ document.getElementById("editor-code").addEventListener("input", event => {
   document.getElementById("editor-message").textContent = editorIsDirty(editorCurrent) ? "Unsaved changes" : "No unsaved changes";
   updateEditorChrome();
 });
+document.getElementById("editor-preview").addEventListener("click", showEditorDiff);
 document.getElementById("editor-save").addEventListener("click", saveEditorFile);
 document.getElementById("editor-save-all").addEventListener("click", saveAllEditorFiles);
+document.getElementById("diff-close").addEventListener("click", closeEditorDiff);
+document.getElementById("diff-save").addEventListener("click", async () => { closeEditorDiff(); await saveEditorFile(); });
+document.getElementById("diff-backdrop").addEventListener("click", event => { if(event.target.id==="diff-backdrop") closeEditorDiff(); });
+document.addEventListener("keydown", event => { if(event.key==="Escape" && !document.getElementById("diff-backdrop").hidden) closeEditorDiff(); });
 
 loadTools();
 
