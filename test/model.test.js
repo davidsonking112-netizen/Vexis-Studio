@@ -39,7 +39,11 @@ test("real model runtime normalizes a final provider response", async () => {
   const body = JSON.parse(request.options.body);
   assert.equal(body.model, "test-model");
   assert.equal(body.messages[0].content, "hello");
+  assert.equal(body.max_tokens, 8192);
+  assert.equal("tools" in body, false);
+  assert.equal("tool_choice" in body, false);
   assert.equal(request.options.headers.authorization, "Bearer test-key");
+  assert.equal(request.options.headers.accept, "application/json");
 });
 
 test("real model runtime converts tool definitions and normalizes tool calls", async () => {
@@ -228,4 +232,25 @@ test("streaming transport handles fragmented SSE frames and fragmented tool argu
   assert.equal(complete.response.type, "tool_calls");
   assert.equal(complete.response.calls[0].name, "inspect");
   assert.deepEqual(complete.response.calls[0].input, { path: "src" });
+});
+
+
+test("real model runtime gives actionable diagnostics for non-JSON provider responses", async () => {
+  const model = new OpenAICompatibleModel({
+    apiKey: "test-key",
+    baseUrl: "https://example.test/v1",
+    model: "test-model",
+    fetchImpl: async () => new Response("<html>upstream unavailable</html>", {
+      status: 502,
+      headers: { "content-type": "text/html" }
+    })
+  });
+
+  await assert.rejects(
+    model.next({ messages: [{ role: "user", content: "hello" }] }),
+    error => /invalid JSON/.test(error.message)
+      && /status 502/.test(error.message)
+      && /content-type text\/html/.test(error.message)
+      && /upstream unavailable/.test(error.message)
+  );
 });
