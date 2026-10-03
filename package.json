@@ -8,13 +8,15 @@
     "start": "node src/index.js",
     "test": "node --test",
     "cli": "node src/cli-entry.js",
-    "tui": "node src/tui-entry.js"
+    "tui": "node src/tui-entry.js",
+    "desktop": "node src/desktop-entry.js"
   },
   "engines": {
     "node": ">=20"
   },
   "bin": {
     "vexis": "src/cli-entry.js",
-    "vexis-tui": "src/tui-entry.js"
+    "vexis-tui": "src/tui-entry.js",
+    "vexis-desktop": "src/desktop-entry.js"
   }
 }
