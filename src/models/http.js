@@ -231,8 +231,9 @@ export class OpenAICompatibleModel {
     };
   }
 
-  async next({ messages, toolDefinitions = [], signal }) {
+  async next({ messages, toolDefinitions = [], signal, maxTokens = this.maxTokens }) {
     if (!Array.isArray(messages)) throw new TypeError("messages must be an array");
+    if (!Number.isInteger(maxTokens) || maxTokens < 1) throw new TypeError("maxTokens must be a positive integer");
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -257,7 +258,7 @@ export class OpenAICompatibleModel {
               model: this.model,
               messages: toProviderMessages(messages),
               temperature: 0,
-              max_tokens: this.maxTokens,
+              max_tokens: maxTokens,
               ...(toolDefinitions.length ? {
                 tools: toProviderTools(toolDefinitions),
                 tool_choice: "auto"
