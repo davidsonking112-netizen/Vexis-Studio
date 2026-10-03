@@ -24,7 +24,7 @@ test("runs the declared npm test script and returns structured diagnostics", asy
     await writePackage(workspace, {
       name: "fixture",
       scripts: {
-        test: "node -e \"process.stdout.write('verification ok')\""
+        test: "node test/fixtures/npm-pass.js"
       }
     });
 
@@ -50,7 +50,7 @@ test("reports a failing test command without throwing", async () => {
     await writePackage(workspace, {
       name: "fixture",
       scripts: {
-        test: "node -e \"process.stderr.write('failure detail'); process.exit(2)\""
+        test: "node test/fixtures/npm-fail.js"
       }
     });
 
