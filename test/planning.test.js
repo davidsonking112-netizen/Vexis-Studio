@@ -107,3 +107,50 @@ test("planning engine rejects non-final model responses", async () => {
   });
   await assert.rejects(engine.create("bad plan"), /final JSON plan/);
 });
+
+
+test("planning replaces stale persisted state instead of silently executing an unpersisted plan", async () => {
+  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "vexis-planning-replace-"));
+  const taskState = createTaskStateTool({ workspace });
+  const contextEngine = { maxTokens: 1000, async build() { return { content: "" }; } };
+  const model = {
+    async next() {
+      return { type: "final", content: JSON.stringify({
+        plan_id: "fresh-plan",
+        task: "new task",
+        summary: "fresh",
+        goals: [],
+        assumptions: [],
+        risks: [],
+        completion: ["done"],
+        steps: [{
+          id: "fresh-step",
+          title: "Fresh",
+          objective: "do it",
+          rationale: "",
+          dependencies: [],
+          files: [],
+          actions: ["do it"],
+          verification: ["test it"],
+          acceptance: ["it works"],
+          rollback: "",
+          priority: "normal",
+          status: "pending",
+          notes: ""
+        }]
+      }) };
+    }
+  };
+  await taskState.execute({
+    action: "initialize",
+    task: "old task",
+    task_id: "old-plan",
+    plan: [{ id: "old-step", title: "Old", status: "pending" }]
+  });
+  const engine = new PlanningEngine({ model, contextEngine, taskState });
+  const plan = await engine.create("new task");
+  assert.equal(plan.plan_id, "fresh-plan");
+  const state = await taskState.execute({ action: "read" });
+  assert.equal(state.state.task_id, "fresh-plan");
+  assert.equal(state.state.plan[0].id, "fresh-step");
+});
