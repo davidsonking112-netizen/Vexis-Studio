@@ -108,6 +108,35 @@ test("planning engine generates, validates, and persists a rich plan", async () 
   }
 });
 
+test("planning engine repairs an unparseable planner response", async () => {
+  let calls = 0;
+  const contextEngine = { maxTokens: 1000, async build() { return { content: "repo" }; } };
+  const model = {
+    async next() {
+      calls += 1;
+      if (calls === 1) return { type: "final", content: "Here is the plan but it was truncated..." };
+      return { type: "final", content: JSON.stringify(samplePlan()) };
+    }
+  };
+  const engine = new PlanningEngine({ model, contextEngine });
+  const plan = await engine.create("Implement a feature");
+  assert.equal(calls, 2);
+  assert.equal(plan.steps.length, 2);
+});
+
+test("planning engine keeps the normal planner output budget configurable", async () => {
+  let request;
+  const model = {
+    async next(input) {
+      request = input;
+      return { type: "final", content: JSON.stringify(samplePlan()) };
+    }
+  };
+  const engine = new PlanningEngine({ model, outputTokens: 1234 });
+  await engine.create("Implement a feature");
+  assert.equal(request.maxTokens, 1234);
+});
+
 test("planning engine rejects non-final model responses", async () => {
   const engine = new PlanningEngine({
     model: { async next() { return { type: "tool_call", name: "noop", input: {} }; } }
