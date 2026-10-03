@@ -188,7 +188,9 @@ The second interface layer adds a dependency-free terminal workspace:
 
 The TUI uses Node's keypress events and raw TTY mode rather than introducing a UI framework dependency. Node documents that keypress events on a TTY require raw mode, and TTY streams expose resize events for responsive rendering. citeturn0search0turn0search1
 
-The Desktop sector will reuse this same runtime and keep desktop-specific concerns outside the agent kernel.\n\nThe Desktop sector is a dependency-free local application shell:
+The Desktop sector will reuse this same runtime and keep desktop-specific concerns outside the agent kernel.
+
+The Desktop sector is a dependency-free local application shell:
 
 - serves a polished browser-based coding workspace on loopback only
 - reuses the same `createRuntime()` agent, registry, and tool contracts
@@ -200,3 +202,28 @@ The Desktop sector will reuse this same runtime and keep desktop-specific concer
 - includes a `vexis-desktop` executable
 
 This is intentionally a **desktop shell**, not a native Electron-style application and not an OS-level sandbox. The browser UI is local to the machine; stronger permissions and isolation remain part of Stage 12.
+
+
+## Stage 10 editor integration
+
+Stage 10 turns the desktop shell into a guarded multi-file development surface while keeping all writes behind the existing filesystem and edit boundaries.
+
+The editor currently provides:
+
+- bounded workspace file browsing that excludes hidden files and dependency directories from the UI
+- UTF-8 text-file opening with binary-file rejection
+- multi-file tabs with independent in-memory buffers and dirty state
+- SHA-256 guarded saves that reject stale on-disk changes
+- Save and Save All flows plus explicit discard protection when closing or switching dirty files
+- change preview with bounded line-based diff rendering
+- find, next/previous match, replace-one, and replace-all operations
+- cursor-aware line/column status and symbol navigation
+- lightweight built-in editor intelligence for JavaScript, TypeScript, JSX/TSX, Python, JSON, Markdown, CSS, and HTML-family files
+- bounded document symbols and structural diagnostics, including unmatched delimiters, deferred-work markers, and trailing whitespace
+- diagnostic navigation and live re-analysis while editing
+- editor keyboard shortcuts for save and find, plus indentation on Tab
+- a dependency-free implementation that does not pretend to be a full language server
+
+The intelligence layer is intentionally lightweight and deterministic. Full LSP integration, richer semantic analysis, refactoring services, and language-server-backed completion remain later platform work rather than being hidden inside the Stage 10 editor.
+
+Stage 10 is complete when the editor surface, intelligence boundary, guarded persistence, diff/review flow, and automated coverage remain green together.
