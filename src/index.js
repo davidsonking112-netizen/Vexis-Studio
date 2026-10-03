@@ -1,11 +1,21 @@
 import { Agent } from "./agent.js";
 import { createFilesystemTools, toAgentTools } from "./tools/filesystem.js";
+import { createCommandTool, toAgentCommandTool } from "./tools/command.js";
+
+const workspace = process.cwd();
 
 const filesystem = createFilesystemTools({
-  workspace: process.cwd()
+  workspace
 });
 
-const tools = toAgentTools(filesystem);
+const command = createCommandTool({
+  workspace
+});
+
+const tools = {
+  ...toAgentTools(filesystem),
+  ...toAgentCommandTool(command)
+};
 
 const model = {
   async next({ messages, tools: availableTools }) {
@@ -21,8 +31,19 @@ const model = {
 
     if (last?.role === "tool" && last.name === "list_files") {
       return {
+        type: "tool_call",
+        name: "run_command",
+        input: {
+          command: process.execPath,
+          args: ["--version"]
+        }
+      };
+    }
+
+    if (last?.role === "tool" && last.name === "run_command") {
+      return {
         type: "final",
-        content: `I inspected the workspace. Available tools: ${availableTools.join(", ")}. The filesystem layer is operational.`
+        content: `Workspace inspection and controlled command execution are operational. Tools: ${availableTools.join(", ")}.`
       };
     }
 
