@@ -46,7 +46,7 @@ test("reads a text file", async () => {
   }
 });
 
-test("prevents workspace escape", async () => {
+test("prevents lexical workspace escape", async () => {
   const workspace = await createWorkspace();
 
   try {
@@ -56,6 +56,66 @@ test("prevents workspace escape", async () => {
       tools.read_file.execute({ path: "../outside.txt" }),
       /escapes the workspace/
     );
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("does not follow symlinks while listing", async () => {
+  const workspace = await createWorkspace();
+  const outside = await fs.mkdtemp(path.join(os.tmpdir(), "vexis-outside-"));
+
+  try {
+    await fs.writeFile(path.join(outside, "secret.txt"), "outside");
+    await fs.symlink(outside, path.join(workspace, "linked"));
+
+    const tools = createFilesystemTools({ workspace });
+    const result = await tools.list_files.execute({});
+
+    assert.deepEqual(result.entries, [
+      { path: "linked", type: "symlink" }
+    ]);
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+    await fs.rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("rejects a symlink that points outside the workspace", async () => {
+  const workspace = await createWorkspace();
+  const outside = await fs.mkdtemp(path.join(os.tmpdir(), "vexis-outside-"));
+
+  try {
+    await fs.writeFile(path.join(outside, "secret.txt"), "outside");
+    await fs.symlink(
+      path.join(outside, "secret.txt"),
+      path.join(workspace, "secret.txt")
+    );
+
+    const tools = createFilesystemTools({ workspace });
+
+    await assert.rejects(
+      tools.read_file.execute({ path: "secret.txt" }),
+      /escapes the workspace/
+    );
+  } finally {
+    await fs.rm(workspace, { recursive: true, force: true });
+    await fs.rm(outside, { recursive: true, force: true });
+  }
+});
+
+test("honors a caller entry limit", async () => {
+  const workspace = await createWorkspace();
+
+  try {
+    await fs.writeFile(path.join(workspace, "a.txt"), "");
+    await fs.writeFile(path.join(workspace, "b.txt"), "");
+
+    const tools = createFilesystemTools({ workspace, maxEntries: 10 });
+    const result = await tools.list_files.execute({ max_entries: 1 });
+
+    assert.equal(result.entries.length, 1);
+    assert.equal(result.truncated, true);
   } finally {
     await fs.rm(workspace, { recursive: true, force: true });
   }
