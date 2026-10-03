@@ -55,6 +55,6 @@ test("repository intelligence keeps dependency coverage after the symbol budget 
   const filesystem = createFilesystemTools({ workspace: root });
   const intelligence = createRepositoryIntelligence({ workspace: root, filesystem, maxSymbols: 1 });
   const result = await intelligence.inspect({});
-  assert.equal(result.symbols, 1);
+  assert.equal(result.symbol_count, 1);
   assert.ok(result.dependencies.some(d => d.from === "src/a.js" && d.to === "src/b.js"));
 });
