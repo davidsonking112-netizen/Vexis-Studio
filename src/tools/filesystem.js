@@ -115,13 +115,15 @@ export function createFilesystemTools({
           root,
           ignores,
           results,
-          maxEntries: limit
+          maxEntries: limit + 1
         });
+
+        const truncated = results.length > limit;
 
         return {
           root: requestedPath,
-          entries: results,
-          truncated: results.length >= limit
+          entries: results.slice(0, limit),
+          truncated
         };
       }
     },
