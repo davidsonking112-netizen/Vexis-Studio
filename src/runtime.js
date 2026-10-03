@@ -24,6 +24,7 @@ export function createRuntime({
   planningConfig = {},
   memoryConfig = {},
   repositoryConfig = {},
+  tokenBudget = {},
   enablePlanning = true,
   enableMemory = true
 } = {}) {
@@ -64,7 +65,9 @@ export function createRuntime({
     toolDefinitions: registry.list(),
     contextEngine,
     planningEngine,
-    memory
+    memory,
+    repositoryIntelligence,
+    tokenBudget
   });
 
   return {
@@ -80,6 +83,7 @@ export function createRuntime({
     planningEngine,
     memory,
     repositoryIntelligence,
+    tokenBudget,
     workspace
   };
 }
