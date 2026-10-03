@@ -31,7 +31,7 @@ Each stage should produce a runnable, testable artifact. We do not build the ent
 1. **Agent kernel** — a minimal model → tool → observation loop. **Implemented**
 2. **Filesystem tools** — controlled listing and reading inside a workspace. **Implemented**
 3. **Command execution** — run approved development commands without invoking a shell. **Implemented**
-4. **Codebase understanding** — structured project inspection and context selection.
+4. **Codebase understanding** — bounded structural project inspection and context selection. **Implemented**
 5. **Editing loop** — propose/apply changes and verify them.
 6. **Test/debug loop** — run tests, inspect failures, repair, repeat.
 7. **Persistent task state** — plans, checkpoints, and resumable work.
