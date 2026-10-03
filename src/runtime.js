@@ -32,5 +32,5 @@ export function createRuntime({ workspace = process.cwd() } = {}) {
       return { type: "final", content: "Done." };
     }
   };
-  return { agent: new Agent({ model, tools }), registry, workspace };
+  return { agent: new Agent({ model, tools }), registry, filesystem, edit, codebase, workspace };
 }
