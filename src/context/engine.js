@@ -204,11 +204,18 @@ export class ContextEngine {
     const normalized = normalizePath(filePath);
     try {
       const result = await this.filesystem.read_file.execute({ path: normalized });
-      const compressed = compressText(result.content, estimateTokens(result.content) > estimateTokens(this.maxFileBytes) ? estimateTokens(this.maxFileBytes) : Math.max(1, Math.floor(this.maxFileBytes / 3.5)));
+      const bytes = Buffer.from(result.content, "utf8");
+      const bounded = bytes.length > this.maxFileBytes
+        ? bytes.subarray(0, this.maxFileBytes).toString("utf8")
+        : result.content;
+      const compressed = compressText(
+        bounded,
+        Math.max(1, Math.floor(this.maxFileBytes / 3.5))
+      );
       return {
         path: normalized,
         content: compressed.text,
-        truncated: compressed.truncated
+        truncated: compressed.truncated || bytes.length > this.maxFileBytes
       };
     } catch {
       return null;
