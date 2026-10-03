@@ -132,16 +132,50 @@ export function validatePlan(plan) {
 function extractJson(value) {
   if (typeof value === "object" && value !== null) return value;
   const raw = String(value ?? "").trim();
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  const candidate = fenced ? fenced[1].trim() : raw;
+  const fenced = raw.match(/\`\`\`(?:json)?\s*([\\s\\S]*?)\s*\`\`\`/i);
+  const candidate = (fenced ? fenced[1] : raw).trim();
+
   try {
     return JSON.parse(candidate);
-  } catch {
-    const start = candidate.indexOf("{");
-    const end = candidate.lastIndexOf("}");
-    if (start >= 0 && end > start) return JSON.parse(candidate.slice(start, end + 1));
-    throw new Error("planner returned invalid JSON");
+  } catch {}
+
+  // Models sometimes wrap valid JSON in prose or append commentary.
+  // Find balanced JSON objects while respecting quoted strings and escapes.
+  for (let start = 0; start < candidate.length; start += 1) {
+    if (candidate[start] !== "{") continue;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let index = start; index < candidate.length; index += 1) {
+      const char = candidate[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === "\\\\") escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+      if (char === "{") depth += 1;
+      else if (char === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          const slice = candidate.slice(start, index + 1);
+          try {
+            return JSON.parse(slice);
+          } catch {
+            break;
+          }
+        }
+      }
+    }
   }
+
+  const preview = candidate.slice(0, 600).replace(/\s+/g, " ");
+  throw new Error("planner returned invalid JSON" + (preview ? ": " + preview : ""));
 }
 
 function topologicalOrder(steps) {
