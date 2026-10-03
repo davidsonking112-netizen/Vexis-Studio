@@ -1,5 +1,5 @@
 export class Agent {
-  constructor({ model, tools = {}, toolDefinitions = null, contextEngine = null, planningEngine = null, maxSteps = 20, onEvent = () => {} }) {
+  constructor({ model, tools = {}, toolDefinitions = null, contextEngine = null, planningEngine = null, memory = null, maxSteps = 20, onEvent = () => {} }) {
     if (!model || typeof model.next !== "function") {
       throw new TypeError("model.next must be a function");
     }
@@ -18,12 +18,29 @@ export class Agent {
       throw new TypeError("planningEngine must provide create()");
     }
     this.planningEngine = planningEngine;
+    if (memory && typeof memory.recall !== "function") throw new TypeError("memory must provide recall()");
+    this.memory = memory;
     this.maxSteps = maxSteps;
     this.onEvent = onEvent;
   }
 
   async getModelResponse(messages, { task, signal, step, onEvent }) {
     let modelMessages = messages;
+    const memoryMessages = [];
+    if (this.memory) {
+      const recalled = await this.memory.recall({ query: task, limit: 10, max_tokens: 2200 });
+      if (recalled.entries.length) {
+        memoryMessages.push({
+          role: "system",
+          content: [
+            "VEXIS AGENT MEMORY",
+            "Durable workspace-local memories for this task. Treat them as evidence, not unquestionable truth; prefer current repository state and verification when they conflict.",
+            JSON.stringify(recalled.entries, null, 2)
+          ].join("\n\n")
+        });
+      }
+      onEvent({ type: "memory_recall", task, entries: recalled.entries, tokens: recalled.tokens, total: recalled.total });
+    }
 
     if (this.contextEngine) {
       const observations = messages
@@ -42,6 +59,7 @@ export class Agent {
       });
 
       modelMessages = [
+        ...memoryMessages,
         { role: "system", content: context.content },
         ...messages
       ];
@@ -54,6 +72,8 @@ export class Agent {
         candidates: context.candidates,
         truncated: context.truncated
       });
+    } else {
+      modelMessages = [...memoryMessages, ...messages];
     }
 
     onEvent({ type: "model_start", step, messages: modelMessages });
@@ -117,6 +137,7 @@ export class Agent {
       if (!tool) {
         const observation = { ok: false, error: "Unknown tool: " + call.name };
         onEvent({ type: "tool_error", step, index, id: callId, name: call.name, error: observation });
+        if (this.memory) await this.memory.remember({ type: "failure", content: `Tool ${call.name} was unavailable: ${observation.error}`, tags: ["tool", call.name, "failure"], source: "agent", confidence: 0.9 });
         return { call, observation };
       }
 
@@ -131,6 +152,7 @@ export class Agent {
           error: error instanceof Error ? error.message : String(error)
         };
         onEvent({ type: "tool_error", step, index, id: callId, name: call.name, error: observation });
+        if (this.memory) await this.memory.remember({ type: "failure", content: `Tool ${call.name} failed: ${observation.error}`, tags: ["tool", call.name, "failure"], source: "agent", confidence: 0.9 });
         return { call, observation };
       }
     }));
@@ -204,6 +226,7 @@ export class Agent {
       }
 
       if (response.type === "final") {
+        if (this.memory) await this.memory.remember({ type: "success", content: `Task completed: ${task}`, tags: ["task", "completed"], source: "agent", confidence: 0.75 });
         return {
           status: "completed",
           output: response.content ?? "",
