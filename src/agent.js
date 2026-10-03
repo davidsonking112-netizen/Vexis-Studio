@@ -111,13 +111,15 @@ export class Agent {
       return response;
     }
 
-    return this.model.next({
+    const response = await this.model.next({
       messages: modelMessages,
       tools: Object.keys(this.tools),
       toolDefinitions: this.toolDefinitions,
       maxTokens: requestBudget.outputTokens,
       signal
     });
+    budget.record(response?.usage);
+    return response;
   }
 
   normalizeCalls(response) {
