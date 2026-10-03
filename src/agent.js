@@ -10,20 +10,20 @@ export class Agent {
     this.onEvent = onEvent;
   }
 
-  async run(task, { signal } = {}) {
+  async run(task, { signal, onEvent = this.onEvent } = {}) {
     if (signal?.aborted) throw new Error("Task cancelled");
     const messages = [{ role: "user", content: task }];
 
     for (let step = 0; step < this.maxSteps; step++) {
       if (signal?.aborted) throw new Error("Task cancelled");
-      this.onEvent({ type: "model_start", step, messages });
+      onEvent({ type: "model_start", step, messages });
 
       const response = await this.model.next({
         messages,
         tools: Object.keys(this.tools)
       });
 
-      this.onEvent({ type: "model_response", step, response });
+      onEvent({ type: "model_response", step, response });
 
       if (!response || typeof response !== "object") {
         throw new Error("Model returned an invalid response");
@@ -51,7 +51,7 @@ export class Agent {
           name,
           content: JSON.stringify(error)
         });
-        this.onEvent({ type: "tool_error", step, name, error });
+        onEvent({ type: "tool_error", step, name, error });
         continue;
       }
 
@@ -65,7 +65,7 @@ export class Agent {
           content: JSON.stringify(observation)
         });
 
-        this.onEvent({ type: "tool_result", step, name, observation });
+        onEvent({ type: "tool_result", step, name, observation });
       } catch (error) {
         const observation = {
           ok: false,
@@ -78,7 +78,7 @@ export class Agent {
           content: JSON.stringify(observation)
         });
 
-        this.onEvent({ type: "tool_error", step, name, error: observation });
+        onEvent({ type: "tool_error", step, name, error: observation });
       }
     }
 
