@@ -433,11 +433,11 @@ function updateEditorLocation() {
 }
 function renderEditorIntelligence(result) {
   const symbolsSelect=document.getElementById("editor-symbols");
-  symbolsSelect.innerHTML=result.symbols.length?result.symbols.map((s,i)=>\`<option value="${i}">${s.kind} · ${s.name} · ${s.line}:${s.column}</option>\`).join(""):"<option value=\"\">No symbols</option>";
+  symbolsSelect.innerHTML=result.symbols.length?result.symbols.map((s,i)=>"<option value=\"" + i + "\">" + s.kind + " · " + s.name + " · " + s.line + ":" + s.column + "</option>").join(""):"<option value=\"\">No symbols</option>";
   symbolsSelect.disabled=!result.symbols.length;
   const diagnostics=document.getElementById("editor-diagnostics");
   const errors=result.diagnostics.filter(d=>d.severity==="error").length;
-  diagnostics.innerHTML=result.diagnostics.length?result.diagnostics.map((d,i)=>\`<option value="${i}">${d.severity} · ${d.line}:${d.column} · ${d.message}</option>\`).join(""):"<option value=\"\">No diagnostics</option>"; diagnostics.disabled=!result.diagnostics.length; diagnostics.title=result.diagnostics.length?(errors+" errors · "+result.diagnostics.length+" diagnostics"):"No diagnostics";
+  diagnostics.innerHTML=result.diagnostics.length?result.diagnostics.map((d,i)=>"<option value=\"" + i + "\">" + d.severity + " · " + d.line + ":" + d.column + " · " + d.message + "</option>").join(""):"<option value=\"\">No diagnostics</option>"; diagnostics.disabled=!result.diagnostics.length; diagnostics.title=result.diagnostics.length?(errors+" errors · "+result.diagnostics.length+" diagnostics"):"No diagnostics";
   document.getElementById("editor-intelligence").textContent=result.symbols.length+" symbols · "+result.language;
   const activityText=result.diagnostics.length ? result.diagnostics.slice(0,3).map(d=>d.severity.toUpperCase()+" · line "+d.line+" · "+d.message).join("<br>") : "<strong>Editor intelligence</strong><br>No structural issues detected.";
   activity.innerHTML=activityText;
