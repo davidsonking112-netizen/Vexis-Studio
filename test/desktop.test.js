@@ -36,6 +36,8 @@ test("desktop serves a local UI and tool endpoints", async () => {
     assert.match(html, /Preview/);
     assert.match(html, /Find & Replace/);
     assert.match(html, /Replace all/);
+    assert.match(html, /Jump to symbol/);
+    assert.match(html, /Jump to diagnostic/);
     assert.match(html, /diff-backdrop/);
     assert.match(html, /buildEditorDiff/);
     assert.match(html, /Unsaved changes/);
