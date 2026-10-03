@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 const STATUSES = new Set(["pending", "in_progress", "blocked", "completed"]);
-const STEP_STATUSES = new Set(["pending", "in_progress", "completed", "skipped"]);
+const STEP_STATUSES = new Set(["pending", "in_progress", "completed", "blocked", "skipped"]);
 
 function isWithin(root, target) {
   const relative = path.relative(root, target);
@@ -41,7 +41,16 @@ function validatePlan(plan) {
       id,
       title: String(step.title),
       status,
-      notes: step.notes == null ? "" : String(step.notes)
+      notes: step.notes == null ? "" : String(step.notes),
+      objective: step.objective == null ? "" : String(step.objective),
+      rationale: step.rationale == null ? "" : String(step.rationale),
+      dependencies: Array.isArray(step.dependencies) ? [...new Set(step.dependencies.map(String))] : [],
+      files: Array.isArray(step.files) ? [...new Set(step.files.map(String))] : [],
+      actions: Array.isArray(step.actions) ? step.actions.map(String) : [],
+      verification: Array.isArray(step.verification) ? step.verification.map(String) : [],
+      acceptance: Array.isArray(step.acceptance) ? step.acceptance.map(String) : [],
+      rollback: step.rollback == null ? "" : String(step.rollback),
+      priority: step.priority == null ? "normal" : String(step.priority)
     };
   });
 }
