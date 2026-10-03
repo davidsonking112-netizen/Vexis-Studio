@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Agent } from "../src/agent.js";
 import { ScriptedModel } from "../src/model.js";
+import { compactMessages } from "../src/runtime/token-budget.js";
 
 test("agent can call a tool and continue", async () => {
   const model = new ScriptedModel([
