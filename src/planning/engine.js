@@ -260,13 +260,29 @@ export class PlanningEngine {
     topologicalOrder(plan.steps);
 
     if (this.taskState) {
-      await this.taskState.execute({
-        action: "initialize",
-        task: plan.task,
-        task_id: plan.plan_id,
-        plan: plan.steps,
-        status: "pending"
-      });
+      const current = await this.taskState.execute({ action: "read" });
+      if (!current.state) {
+        await this.taskState.execute({
+          action: "initialize",
+          task: plan.task,
+          task_id: plan.plan_id,
+          plan: plan.steps,
+          status: "pending"
+        });
+      } else {
+        // A new planning pass must never silently execute a plan that was not persisted.
+        // Replace stale state atomically at the task-state contract level and clear
+        // checkpoints because their step identities belong to the previous plan.
+        await this.taskState.execute({
+          action: "update",
+          task: plan.task,
+          task_id: plan.plan_id,
+          plan: plan.steps,
+          status: "pending",
+          current_step: null,
+          checkpoint: null
+        });
+      }
     }
 
     return plan;
