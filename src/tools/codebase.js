@@ -45,6 +45,9 @@ export function createCodebaseTool({
         throw new Error("Path escapes the workspace");
       }
 
+      const relativeRoot = path.relative(root, directory) || ".";
+      await fs.stat(directory);
+
       const limit = Math.min(
         Number.isInteger(Number(max_files)) && Number(max_files) > 0
           ? Number(max_files)
@@ -66,7 +69,7 @@ export function createCodebaseTool({
         const name = path.basename(entry.path);
         if (!MANIFESTS.includes(name)) continue;
 
-        const absolute = path.join(root, entry.path);
+        const absolute = path.resolve(root, entry.path);
 
         try {
           const stat = await fs.stat(absolute);
@@ -96,6 +99,7 @@ export function createCodebaseTool({
       }
 
       const entryPoints = ENTRY_CANDIDATES
+        .map(candidate => path.join(relativeRoot, candidate).split(path.sep).join("/"))
         .filter(candidate => files.some(entry => entry.path === candidate))
         .map(candidate => ({ path: candidate }));
 
