@@ -20,6 +20,15 @@ test("token budget clamps output and records provider usage", () => {
   assert.equal(budget.snapshot().requests, 1);
 });
 
+test("token budget accepts missing provider usage", () => {
+  const budget = new TokenBudget({ maxTotalTokens: 1000, maxInputTokens: 400, maxOutputTokens: 200 });
+  budget.record(null);
+  budget.record();
+  assert.equal(budget.snapshot().usedInputTokens, 0);
+  assert.equal(budget.snapshot().usedOutputTokens, 0);
+  assert.equal(budget.snapshot().requests, 2);
+});
+
 test("token budget exhausts cleanly instead of sending an unbounded request", () => {
   const budget = new TokenBudget({ maxTotalTokens: 300, maxInputTokens: 150, maxOutputTokens: 100 });
   budget.record({ prompt_tokens: 200, completion_tokens: 100 });

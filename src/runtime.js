@@ -8,6 +8,7 @@ import { createCodebaseTool } from "./tools/codebase.js";
 import { createEditTool } from "./tools/edit.js";
 import { createTestTool } from "./tools/test.js";
 import { createTaskStateTool } from "./tools/task_state.js";
+import { createSearchTool } from "./tools/search.js";
 import { createContextEngine } from "./context/engine.js";
 import { createPlanningEngine } from "./planning/engine.js";
 import { createAgentMemory } from "./memory/engine.js";
@@ -41,6 +42,7 @@ export function createRuntime({
   const edit = createEditTool({ workspace, filesystem });
   const testTool = createTestTool({ workspace, command });
   const taskState = createTaskStateTool({ workspace });
+  const search = createSearchTool({ workspace });
   const contextEngine = createContextEngine({ workspace, filesystem, taskState, ...contextConfig });
   const planningEngine = enablePlanning
     ? createPlanningEngine({ model: selectedModel, contextEngine, taskState, ...planningConfig })
@@ -54,6 +56,7 @@ export function createRuntime({
     edit_file: edit,
     run_tests: testTool,
     task_state: taskState,
+    search_workspace: search,
     ...(memory ? { agent_memory: memory } : {}),
     repository_intelligence: repositoryIntelligence
   });
@@ -78,6 +81,7 @@ export function createRuntime({
     registry,
     filesystem,
     edit,
+    search,
     codebase,
     contextEngine,
     planningEngine,

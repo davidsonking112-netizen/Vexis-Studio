@@ -177,8 +177,9 @@ export class TokenBudget {
   }
 
   record(usage = {}) {
-    const inputTokens = Number(usage.prompt_tokens ?? usage.input_tokens ?? 0);
-    const outputTokens = Number(usage.completion_tokens ?? usage.output_tokens ?? 0);
+    const normalizedUsage = usage && typeof usage === "object" ? usage : {};
+    const inputTokens = Number(normalizedUsage.prompt_tokens ?? normalizedUsage.input_tokens ?? 0);
+    const outputTokens = Number(normalizedUsage.completion_tokens ?? normalizedUsage.output_tokens ?? 0);
     if (Number.isFinite(inputTokens) && inputTokens > 0) this.usedInputTokens += Math.floor(inputTokens);
     if (Number.isFinite(outputTokens) && outputTokens > 0) this.usedOutputTokens += Math.floor(outputTokens);
     this.requests += 1;
