@@ -41,6 +41,41 @@ test("agent reports unknown tools to the model", async () => {
   assert.equal(result.output, "recovered");
 });
 
+test("agent reports an empty model completion as a no-op", async () => {
+  const events = [];
+  const agent = new Agent({
+    model: {
+      async next() {
+        return { type: "final", content: "   ", provider: "test", model: "empty-model" };
+      }
+    },
+    onEvent: event => events.push(event)
+  });
+
+  const result = await agent.run("implement the feature");
+
+  assert.equal(result.status, "model_noop");
+  assert.equal(result.output, "");
+  assert.equal(result.provider, "test");
+  assert.equal(result.model, "empty-model");
+  assert.deepEqual(events.find(event => event.type === "model_noop"), {
+    type: "model_noop",
+    step: 0,
+    provider: "test",
+    model: "empty-model",
+    reason: "empty_final_response"
+  });
+});
+
+test("agent still completes meaningful final responses", async () => {
+  const agent = new Agent({
+    model: { async next() { return { type: "final", content: "Implemented and verified." }; } }
+  });
+  const result = await agent.run("implement the feature");
+  assert.equal(result.status, "completed");
+  assert.equal(result.output, "Implemented and verified.");
+});
+
 test("agent stops at the step limit", async () => {
   const model = {
     async next() {

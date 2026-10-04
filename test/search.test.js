@@ -41,6 +41,9 @@ test("search supports case sensitivity and result limits", async () => {
   const limited = await search({ query: "alpha", max_results: 2 });
   assert.equal(limited.matches.length, 2);
   assert.equal(limited.truncated, true);
+  const exact = await search({ query: "alpha", max_results: 10 });
+  assert.equal(exact.matches.length, 3);
+  assert.equal(exact.truncated, false);
 });
 
 test("search rejects escapes and malformed input", async () => {
@@ -51,6 +54,8 @@ test("search rejects escapes and malformed input", async () => {
   await assert.rejects(() => search({ query: "x", case_sensitive: "yes" }), /case_sensitive/);
   await assert.rejects(() => search({ query: "x", max_results: 0 }), /positive integer/);
   await assert.rejects(() => search({ query: "Alpha", path: "linked-src" }), /Symlink/);
+  await assert.rejects(() => search({ query: "Alpha", path: ".hidden" }), /Hidden or ignored/);
+  await assert.rejects(() => search({ query: "Alpha", path: "node_modules" }), /Hidden or ignored/);
 });
 
 test("runtime registers search_workspace", async () => {

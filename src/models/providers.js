@@ -3,10 +3,10 @@ import { OpenAICompatibleModel } from "./http.js";
 import { AnthropicModel } from "./anthropic.js";
 
 export const PROVIDER_CAPABILITIES = Object.freeze({
-  "openai": Object.freeze({ toolCalling: true, structuredOutput: true, vision: true, streaming: true, parallelToolCalls: true }),
-  "anthropic": Object.freeze({ toolCalling: true, structuredOutput: false, vision: true, streaming: true, parallelToolCalls: true }),
+  "openai": Object.freeze({ toolCalling: true, structuredOutput: false, vision: false, streaming: true, parallelToolCalls: true }),
+  "anthropic": Object.freeze({ toolCalling: true, structuredOutput: false, vision: false, streaming: true, parallelToolCalls: true }),
   "openai-compatible": Object.freeze({ toolCalling: true, structuredOutput: false, vision: false, streaming: true, parallelToolCalls: true }),
-  "qwen": Object.freeze({ toolCalling: true, structuredOutput: true, vision: true, streaming: true, parallelToolCalls: true }),
+  "qwen": Object.freeze({ toolCalling: true, structuredOutput: false, vision: false, streaming: true, parallelToolCalls: true }),
   "local": Object.freeze({ toolCalling: true, structuredOutput: false, vision: false, streaming: true, parallelToolCalls: true })
 });
 

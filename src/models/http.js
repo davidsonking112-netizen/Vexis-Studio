@@ -1,4 +1,5 @@
 import { normalizeModelEvent, normalizeModelResponse } from "./model.js";
+import { toToolInputSchema } from "./tool-schema.js";
 
 const DEFAULT_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_MODEL = "gpt-5";
@@ -105,9 +106,7 @@ function toProviderTools(toolDefinitions = []) {
     function: {
       name: definition.name,
       description: definition.description || "",
-      parameters: definition.input && typeof definition.input === "object" && Object.keys(definition.input).length
-        ? definition.input
-        : { type: "object", properties: {}, additionalProperties: false }
+      parameters: toToolInputSchema(definition.input)
     }
   }));
 }

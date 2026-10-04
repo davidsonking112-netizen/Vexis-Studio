@@ -1,4 +1,5 @@
 import { normalizeModelEvent, normalizeModelResponse } from "./model.js";
+import { toToolInputSchema } from "./tool-schema.js";
 
 const DEFAULT_BASE_URL = "https://api.anthropic.com";
 const DEFAULT_MODEL = "claude-sonnet-4-5";
@@ -94,9 +95,7 @@ function toTools(definitions = []) {
   return definitions.map(def => ({
     name: def.name,
     description: def.description || "",
-    input_schema: def.input && typeof def.input === "object" && Object.keys(def.input).length
-      ? def.input
-      : { type: "object", properties: {}, additionalProperties: false }
+    input_schema: toToolInputSchema(def.input)
   }));
 }
 

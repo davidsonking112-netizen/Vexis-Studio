@@ -31,6 +31,14 @@ function normalizeLimit(value, fallback, maximum) {
   return Math.min(value, maximum);
 }
 
+function assertSearchablePath(root, target, ignores) {
+  const relative = path.relative(root, target);
+  const parts = relative ? relative.split(path.sep) : [];
+  if (parts.some(part => part.startsWith(".") || ignores.has(part))) {
+    throw new Error("Hidden or ignored paths are not searchable");
+  }
+}
+
 async function walk(directory, root, ignores, files, maxFiles) {
   if (files.length >= maxFiles) return;
   const entries = await fs.readdir(directory, { withFileTypes: true });
@@ -70,6 +78,7 @@ export function createSearchTool({ workspace, ignores = DEFAULT_IGNORES, maxResu
       const target = resolveInside(root, requestedPath);
       const targetLink = await fs.lstat(target);
       if (targetLink.isSymbolicLink()) throw new Error("Symlink paths are not searchable");
+      assertSearchablePath(root, target, ignores);
       const realRoot = await fs.realpath(root);
       const realTarget = await fs.realpath(target);
       if (!isWithin(realRoot, realTarget)) throw new Error("Path escapes the workspace");
@@ -88,7 +97,7 @@ export function createSearchTool({ workspace, ignores = DEFAULT_IGNORES, maxResu
       let filesScanned = 0;
       let truncated = files.length >= maxFiles;
       for (const file of files) {
-        if (matches.length >= limit) { truncated = true; break; }
+        if (matches.length > limit) { truncated = true; break; }
         const fileStat = await fs.stat(file.absolute);
         if (fileStat.size > maxReadBytes) { truncated = true; continue; }
         const buffer = await fs.readFile(file.absolute);
@@ -96,18 +105,18 @@ export function createSearchTool({ workspace, ignores = DEFAULT_IGNORES, maxResu
         filesScanned += 1;
         const content = buffer.toString("utf8");
         const lines = content.split(/\r?\n/);
-        for (let index = 0; index < lines.length && matches.length < limit; index += 1) {
+        for (let index = 0; index < lines.length && matches.length <= limit; index += 1) {
           const line = lines[index];
           const haystack = caseSensitive ? line : line.toLocaleLowerCase();
           let offset = haystack.indexOf(needle);
-          while (offset >= 0 && matches.length < limit) {
+          while (offset >= 0 && matches.length <= limit) {
             matches.push({ path: file.relative, line: index + 1, column: offset + 1, text: line });
             offset = haystack.indexOf(needle, offset + Math.max(needle.length, 1));
           }
         }
       }
-      if (matches.length >= limit) truncated = true;
-      return { query, matches, truncated, files_scanned: filesScanned };
+      if (matches.length > limit) truncated = true;
+      return { query, matches: matches.slice(0, limit), truncated, files_scanned: filesScanned };
     }
   };
 }

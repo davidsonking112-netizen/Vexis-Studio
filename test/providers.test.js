@@ -54,7 +54,7 @@ test("anthropic adapter converts tool calls into the common model contract", asy
       { role: "user", content: "inspect" }
     ],
     maxTokens: 1234,
-    toolDefinitions: [{ name: "inspect_codebase", description: "inspect", input: { type: "object", properties: { path: { type: "string" } } } }]
+    toolDefinitions: [{ name: "inspect_codebase", description: "inspect", input: { path: "relative file path", max_files: "optional maximum number of files" } }]
   });
   assert.equal(result.type, "tool_call");
   assert.equal(result.provider, "anthropic");
@@ -64,6 +64,15 @@ test("anthropic adapter converts tool calls into the common model contract", asy
   assert.equal(request.body.system, "Follow the execution plan.");
   assert.equal(request.body.max_tokens, 1234);
   assert.equal(request.body.tools[0].name, "inspect_codebase");
+  assert.deepEqual(request.body.tools[0].input_schema, {
+    type: "object",
+    properties: {
+      path: { type: "string", description: "relative file path" },
+      max_files: { type: "integer", description: "optional maximum number of files" }
+    },
+    required: ["path"],
+    additionalProperties: false
+  });
   assert.equal(request.headers["anthropic-version"], "2023-06-01");
 });
 

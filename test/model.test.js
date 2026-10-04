@@ -86,9 +86,8 @@ test("real model runtime converts tool definitions and normalizes tool calls", a
       name: "inspect_codebase",
       description: "Inspect the project",
       input: {
-        type: "object",
-        properties: { path: { type: "string" }, max_files: { type: "integer" } },
-        required: ["path"]
+      path: "relative file path",
+      max_files: "optional maximum number of files"
       }
     }]
   });
@@ -98,6 +97,15 @@ test("real model runtime converts tool definitions and normalizes tool calls", a
   assert.equal(result.name, "inspect_codebase");
   assert.deepEqual(result.input, { path: "src", max_files: 10 });
   assert.equal(request.tools[0].function.name, "inspect_codebase");
+  assert.deepEqual(request.tools[0].function.parameters, {
+    type: "object",
+    properties: {
+      path: { type: "string", description: "relative file path" },
+      max_files: { type: "integer", description: "optional maximum number of files" }
+    },
+    required: ["path"],
+    additionalProperties: false
+  });
   assert.equal(request.tool_choice, "auto");
   assert.equal(request.messages[0].role, "user");
 });

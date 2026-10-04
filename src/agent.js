@@ -264,6 +264,25 @@ export class Agent {
       }
 
       if (response.type === "final") {
+        const hasToolActivity = messages.some(message => message?.role === "tool");
+        if (!String(response.content ?? "").trim() && !hasToolActivity) {
+          onEvent({
+            type: "model_noop",
+            step,
+            provider: response.provider ?? null,
+            model: response.model ?? null,
+            reason: "empty_final_response"
+          });
+          return {
+            status: "model_noop",
+            output: "",
+            steps: step + 1,
+            usage: response.usage ?? null,
+            provider: response.provider ?? null,
+            model: response.model ?? null,
+            token_budget: budget.snapshot()
+          };
+        }
         if (this.memory) await this.memory.remember({ type: "success", content: `Task completed: ${task}`, tags: ["task", "completed"], source: "agent", confidence: 0.75 });
         return {
           status: "completed",
