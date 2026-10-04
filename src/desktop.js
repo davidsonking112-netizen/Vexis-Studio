@@ -12,7 +12,7 @@ const DESKTOP_HTML = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark">
-<title>Vexis Studio</title>
+<title>Briefly · Vexis Studio · AI brief generator</title>
 <style>
 :root {
   color-scheme: dark;
@@ -235,7 +235,7 @@ kbd { border:1px solid var(--line-strong); background:var(--panel-3); color:var(
 <body>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="logo">V</div><div><strong>Vexis Studio</strong><span>AI coding workspace</span></div></div>
+    <div class="brand"><div class="logo">B</div><div><strong>Briefly</strong><span>AI brief generator</span></div></div>
     <div class="section-label">Workspace</div>
     <nav class="nav">
       <button id="agent-nav" class="active" type="button"><span class="dot"></span>Agent</button>
@@ -260,10 +260,10 @@ kbd { border:1px solid var(--line-strong); background:var(--panel-3); color:var(
     <main id="conversation" class="conversation">
       <section id="empty" class="empty">
         <div class="hero">
-          <div class="hero-orbit"><div class="mark">✦</div></div>
-          <div class="eyebrow"><span class="spark">✦</span> Intelligent development workspace</div>
-          <h1>Build something<br>worth shipping.</h1>
-          <p>Give Vexis a goal. It can inspect the codebase, reason through the work, make guarded changes, and verify the result—all inside this workspace.</p>
+          <div class="hero-orbit"><div class="mark">B</div></div>
+          <div class="eyebrow"><span class="spark">✦</span> AI-only brief generator</div>
+          <h1>Build something<br>clearer.</h1>
+          <p>Drop in a goal, messy notes, or a half-formed idea. Briefly turns it into a focused Summary, Audience, Key points, and Next actions—powered entirely by AI.</p>
           <div class="suggestions">
             <button class="suggestion" data-task="Inspect this codebase and summarize its architecture"><span class="card-icon">⌘</span><strong>Understand the codebase</strong><br>Map the architecture and key entrypoints.</button>
             <button class="suggestion" data-task="Run the test suite and explain any failures"><span class="card-icon">✓</span><strong>Verify the project</strong><br>Run tests and surface actionable failures.</button>
@@ -287,8 +287,8 @@ kbd { border:1px solid var(--line-strong); background:var(--panel-3); color:var(
 
     <div class="composer-wrap">
       <form id="task-form" class="composer">
-        <div class="composer-top"><strong>Vexis Agent</strong><span>Context-aware · guarded edits · verification</span></div>
-        <textarea id="task" rows="2" autocomplete="off" placeholder="What should we build, fix, inspect, or verify?"></textarea>
+        <div class="composer-top"><strong>Briefly AI</strong><span>Structured thinking · concise output</span></div>
+        <textarea id="task" rows="2" autocomplete="off" placeholder="Paste rough notes or a goal…"></textarea>
         <div class="composer-actions">
           <span class="hint"><kbd>Enter</kbd> run · <kbd>Shift</kbd>+<kbd>Enter</kbd> newline · <kbd>Esc</kbd> clear</span>
           <button id="run" class="run" type="submit">Run task ↵</button>
